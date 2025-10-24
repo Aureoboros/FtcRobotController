@@ -13,7 +13,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
 
-@Autonomous(name="Auto: 2 Spike Marks - BLUE", group="Autonomous")
+@Autonomous(name="AutoFR-Blue", group="Autonomous")
 public class AutoTwoSpikeMarksBlue extends LinearOpMode {
     
     // Motor power constants
