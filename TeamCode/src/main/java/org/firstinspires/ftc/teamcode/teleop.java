@@ -23,10 +23,21 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
     private static final double SLOW_MODE_MULTIPLIER = 0.3;
     private static final double JOYSTICK_DEADZONE = 0.1;
     
+    // Robot physical dimensions (in inches)
+    private static final double ROBOT_LENGTH = 17.0;  // Back to front
+    private static final double ROBOT_WIDTH = 12.0;   // Left to right
+    
     // Dead wheel odometry constants
     private static final double ODO_COUNTS_PER_REV = 8192.0;  // REV Through Bore Encoder
     private static final double ODO_WHEEL_DIAMETER_INCHES = 1.26;  // 32mm converted
     private static final double ODO_COUNTS_PER_INCH = ODO_COUNTS_PER_REV / (ODO_WHEEL_DIAMETER_INCHES * Math.PI);
+    
+    // Dead wheel positions relative to robot center (in inches)
+    // Measured positions: Both wheels ~3.5" back, forward wheel 1" left, right wheel 2.5" right
+    private static final double FORWARD_ODO_X_OFFSET = -1.0;  // 1" left of center
+    private static final double FORWARD_ODO_Y_OFFSET = -3.5;  // 3.5" back from center
+    private static final double RIGHT_ODO_X_OFFSET = 2.5;     // 2.5" right of center
+    private static final double RIGHT_ODO_Y_OFFSET = -3.5;    // 3.5" back from center
     
     // Autonomous navigation constants
     private static final double AUTO_MAX_SPEED = 0.7;
@@ -88,7 +99,7 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
         DcMotor rampMotor = hardwareMap.dcMotor.get("rampMotor");
 
         intakeMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        rampMotor.setmode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        rampMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         
         // Declare servo
         Servo gateServo = hardwareMap.servo.get("GateServo");
@@ -141,6 +152,8 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
         telemetry.addLine("========================================");
         telemetry.addLine("INITIALIZING ROBOT");
         telemetry.addLine("========================================");
+        telemetry.addData("Dimensions", "17\" x 12\" (L x W)");
+        telemetry.addData("Hub Location", "Rear");
         telemetry.update();
         
         // Set servos to safe positions
@@ -159,6 +172,7 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
         // Verify dead wheels are reset
         telemetry.addData("Forward Odometry", "Reset to 0");
         telemetry.addData("Right Odometry", "Reset to 0");
+        telemetry.addData("Odo Position", "Rear of robot");
         telemetry.update();
         sleep(200);
         
@@ -184,7 +198,7 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
         boolean intakeForwardActive = false;
         boolean intakeReverseActive = false;
         boolean launchMotorsActive = false;
-        boolean detailedTelemetry = false;  // Toggle for debug vs match mode telemetry
+        boolean detailedTelemetry = false;
         
         waitForStart();
         if (isStopRequested()) return;
@@ -219,7 +233,7 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
                 gateServo.setPosition(GATE_SERVO_DOWN);
             }
             
-            // Check for driver override (any joystick movement)
+            // Check for driver override
             boolean driverOverride = Math.abs(currentGamepad1.left_stick_x) > JOYSTICK_DEADZONE ||
                                     Math.abs(currentGamepad1.left_stick_y) > JOYSTICK_DEADZONE ||
                                     Math.abs(currentGamepad1.right_stick_x) > JOYSTICK_DEADZONE;
@@ -238,7 +252,7 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
                 rx = navOutput[2];
                 
                 // Check if reached destination
-                if (navOutput[3] > 0) {  // navOutput[3] is completion flag
+                if (navOutput[3] > 0) {
                     autoNavigating = false;
                 }
             } else {
@@ -270,15 +284,18 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
                 }
             }
             
-            // Apply slow mode multiplier only when using D-pad
-            double translationMultiplier = 1.0;  // No manual slow mode toggle anymore
+            double translationMultiplier = 1.0;
             
             // Reset IMU
             if (currentGamepad1.options && !previousGamepad1.options) {
                 imu.resetYaw();
+                // Also reset odometry position when IMU is reset
+                robotX = 0;
+                robotY = 0;
+                robotHeading = 0;
             }
             
-            // Toggle detailed telemetry with start button (hold for 0.5s to avoid accidental IMU reset)
+            // Toggle detailed telemetry
             if (currentGamepad1.start && !previousGamepad1.start) {
                 detailedTelemetry = !detailedTelemetry;
             }
@@ -348,10 +365,15 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
             launchMotor1.setPower(launch1Power);
             launchMotor2.setPower(launch2Power);
             
-            // Telemetry - Two modes: Match mode (clean) vs Debug mode (detailed)
+            // Telemetry
             if (detailedTelemetry) {
-                // DEBUG MODE - Full details for testing and troubleshooting
+                // DEBUG MODE
                 telemetry.addLine("========== DEBUG MODE ==========");
+                telemetry.addLine();
+                
+                telemetry.addLine("=== ROBOT CONFIG ===");
+                telemetry.addData("Dimensions", "17\" x 12\"");
+                telemetry.addData("Hub Position", "Rear");
                 telemetry.addLine();
                 
                 telemetry.addLine("=== ALLIANCE & NAVIGATION ===");
@@ -385,11 +407,10 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
                 telemetry.addData("Forward Odo", forwardOdo.getCurrentPosition());
                 telemetry.addData("Right Odo", rightOdo.getCurrentPosition());
             } else {
-                // MATCH MODE - Clean essentials only
+                // MATCH MODE
                 telemetry.addLine("========== MATCH MODE ==========");
                 telemetry.addLine();
                 
-                // Critical info only
                 telemetry.addData("Alliance", selectedAlliance);
                 telemetry.addData("Position", "X: %.1f  Y: %.1f ft", robotX, robotY);
                 telemetry.addData("Heading", "%.0f°", Math.toDegrees(robotHeading));
@@ -437,18 +458,56 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
         double forwardInches = deltaForward / ODO_COUNTS_PER_INCH;
         double rightInches = deltaRight / ODO_COUNTS_PER_INCH;
         
-        // Get current heading from IMU
+        // Get current and previous heading from IMU
         double currentHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+        double deltaHeading = currentHeading - robotHeading;
         
-        // Calculate robot-centric displacement
-        // Forward wheel measures forward/backward movement
-        // Right wheel measures left/right (strafe) movement
-        double robotDX = rightInches;   // Right wheel -> X movement (right is positive)
-        double robotDY = forwardInches; // Forward wheel -> Y movement (forward is positive)
+        // Normalize delta heading to [-PI, PI]
+        while (deltaHeading > Math.PI) deltaHeading -= 2 * Math.PI;
+        while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
         
-        // Convert to field-centric using current heading
-        double fieldDX = robotDX * Math.cos(currentHeading) - robotDY * Math.sin(currentHeading);
-        double fieldDY = robotDX * Math.sin(currentHeading) + robotDY * Math.cos(currentHeading);
+        // Calculate robot-centric displacement accounting for wheel offsets
+        double robotDX, robotDY;
+        
+        if (Math.abs(deltaHeading) < 0.001) {
+            // No rotation - simple case
+            robotDX = rightInches;
+            robotDY = forwardInches;
+        } else {
+            // Robot rotated - account for arc motion of offset wheels
+            // When robot rotates, wheels trace arcs. We need to calculate the center of rotation's movement
+            
+            // Calculate the displacement of each wheel's mounting point due to rotation
+            // Using arc length = radius * angle for small angles, but accounting for the full motion
+            
+            // Forward wheel offset correction
+            double forwardWheelArcX = FORWARD_ODO_X_OFFSET * (Math.cos(deltaHeading) - 1) - 
+                                      FORWARD_ODO_Y_OFFSET * Math.sin(deltaHeading);
+            double forwardWheelArcY = FORWARD_ODO_X_OFFSET * Math.sin(deltaHeading) + 
+                                      FORWARD_ODO_Y_OFFSET * (Math.cos(deltaHeading) - 1);
+            
+            // Right wheel offset correction
+            double rightWheelArcX = RIGHT_ODO_X_OFFSET * (Math.cos(deltaHeading) - 1) - 
+                                    RIGHT_ODO_Y_OFFSET * Math.sin(deltaHeading);
+            double rightWheelArcY = RIGHT_ODO_X_OFFSET * Math.sin(deltaHeading) + 
+                                    RIGHT_ODO_Y_OFFSET * (Math.cos(deltaHeading) - 1);
+            
+            // Measured wheel travel minus the arc motion gives us the actual center displacement
+            double forwardCenterTravel = forwardInches - forwardWheelArcY;
+            double rightCenterTravel = rightInches - rightWheelArcX;
+            
+            // Combine measurements (averaging if both wheels measure same direction)
+            // Forward wheel primarily measures Y, right wheel primarily measures X
+            robotDX = rightCenterTravel;
+            robotDY = forwardCenterTravel;
+        }
+        
+        // Convert to field-centric using the average heading during this movement
+        // Use the midpoint heading for better accuracy
+        double avgHeading = robotHeading + deltaHeading / 2.0;
+        
+        double fieldDX = robotDX * Math.cos(avgHeading) - robotDY * Math.sin(avgHeading);
+        double fieldDY = robotDX * Math.sin(avgHeading) + robotDY * Math.cos(avgHeading);
         
         // Update global position (convert inches to feet)
         robotX += fieldDX / 12.0;
@@ -477,9 +536,9 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
             if (targetDetection != null) {
                 double yawError = targetDetection.ftcPose.yaw;
                 if (Math.abs(yawError) < ANGLE_TOLERANCE_DEGREES) {
-                    completed = 1;  // Fully complete
+                    completed = 1;
                 } else {
-                    rx = Math.signum(yawError) * 0.3;  // Rotate to align
+                    rx = Math.signum(yawError) * 0.3;
                 }
             } else {
                 // No AprilTag visible, use geometric facing
