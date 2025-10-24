@@ -349,23 +349,38 @@ public class AutoTwoSpikeMarks extends LinearOpMode {
             
             if (detection != null) {
                 double yawError = detection.ftcPose.yaw;  // Positive = tag is to the right
+                double bearingError = detection.ftcPose.bearing;  // Horizontal angle to target
+                double range = detection.ftcPose.range;  // Distance in inches
                 
                 telemetry.addData("AprilTag", "ID %d DETECTED", targetTagId);
                 telemetry.addData("Yaw Error", "%.2f degrees", yawError);
+                telemetry.addData("Bearing", "%.2f degrees", bearingError);
+                telemetry.addData("Range", "%.1f inches", range);
                 
-                if (Math.abs(yawError) < APRILTAG_ALIGNMENT_TOLERANCE) {
+                // Check if aligned (both yaw and bearing within tolerance)
+                if (Math.abs(yawError) < APRILTAG_ALIGNMENT_TOLERANCE && 
+                    Math.abs(bearingError) < APRILTAG_ALIGNMENT_TOLERANCE) {
                     aligned = true;
-                    telemetry.addData("Status", "ALIGNED!");
+                    telemetry.addData("Status", "✓ ALIGNED!");
                 } else {
-                    // Rotate to align (positive yaw = rotate right)
-                    double rx = Math.signum(yawError) * APRILTAG_ROTATION_POWER;
-                    driveFieldCentric(0, 0, rx, robotHeading);
-                    telemetry.addData("Status", "Aligning...");
+                    // Use bearing for alignment (like in teleop navigateToAlliance)
+                    // Bearing tells us which direction to rotate to face the tag
+                    double rotationPower = Math.signum(yawError) * APRILTAG_ROTATION_POWER;
+                    
+                    // If bearing is large, also adjust position slightly
+                    double strafeCorrection = 0;
+                    if (Math.abs(bearingError) > 5.0) {
+                        strafeCorrection = -Math.signum(bearingError) * 0.15;  // Strafe to center
+                    }
+                    
+                    driveFieldCentric(strafeCorrection, 0, rotationPower, robotHeading);
+                    telemetry.addData("Status", "Aligning... (Rotate: %.2f, Strafe: %.2f)", 
+                                    rotationPower, strafeCorrection);
                 }
             } else {
                 telemetry.addData("AprilTag", "NOT DETECTED");
                 telemetry.addData("Status", "Searching...");
-                // Gentle rotation to find tag
+                // Gentle rotation to find tag (like in teleop)
                 driveFieldCentric(0, 0, 0.15, robotHeading);
             }
             
@@ -375,7 +390,7 @@ public class AutoTwoSpikeMarks extends LinearOpMode {
         stopDriveMotors();
         
         if (aligned) {
-            telemetry.addData("Alignment", "SUCCESS");
+            telemetry.addData("Alignment", "✓ SUCCESS - Dead on target!");
         } else {
             telemetry.addData("Alignment", "TIMEOUT - Proceeding anyway");
         }
