@@ -1,5 +1,4 @@
 package org.firstinspires.ftc.teamcode;
-
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -21,6 +20,10 @@ public class AutoTwoSpikeMarksBlue extends LinearOpMode {
     private static final double LAUNCH_MOTOR_POWER = 0.6;  // Reduced for better accuracy
     private static final double RAMP_MOTOR_POWER = 1.0;
     
+    // Robot physical dimensions (in inches)
+    private static final double ROBOT_LENGTH = 17.0;  // Back to front
+    private static final double ROBOT_WIDTH = 12.0;   // Left to right
+    
     // Navigation constants
     private static final double AUTO_MAX_SPEED = 0.7;
     private static final double AUTO_MIN_SPEED = 0.15;
@@ -37,6 +40,12 @@ public class AutoTwoSpikeMarksBlue extends LinearOpMode {
     private static final double ODO_COUNTS_PER_REV = 8192.0;
     private static final double ODO_WHEEL_DIAMETER_INCHES = 1.26;
     private static final double ODO_COUNTS_PER_INCH = ODO_COUNTS_PER_REV / (ODO_WHEEL_DIAMETER_INCHES * Math.PI);
+    
+    // Dead wheel positions relative to robot center (in inches)
+    private static final double FORWARD_ODO_X_OFFSET = -1.0;  // 1" left of center
+    private static final double FORWARD_ODO_Y_OFFSET = -3.5;  // 3.5" back from center
+    private static final double RIGHT_ODO_X_OFFSET = 2.5;     // 2.5" right of center
+    private static final double RIGHT_ODO_Y_OFFSET = -3.5;    // 3.5" back from center
     
     // Servo positions
     private static final double GATE_SERVO_DOWN = 0.0;
@@ -83,8 +92,9 @@ public class AutoTwoSpikeMarksBlue extends LinearOpMode {
         initializeHardware();
         
         telemetry.addLine("========================================");
-        telemetry.addLine("BLUE ALLIANCE: 2 SPIKE MARKS AUTO");
+        telemetry.addLine("AUTOFR: BLUE");
         telemetry.addLine("========================================");
+        telemetry.addData("Robot Dimensions", "17\" x 12\"");
         telemetry.addLine();
         telemetry.addLine("INITIALIZING...");
         telemetry.addLine("Detecting Obelisk AprilTags for position...");
@@ -460,26 +470,68 @@ public class AutoTwoSpikeMarksBlue extends LinearOpMode {
     }
     
     private void updateOdometry() {
+        // Read current encoder positions
         int forwardPos = forwardOdo.getCurrentPosition();
         int rightPos = rightOdo.getCurrentPosition();
         
+        // Calculate deltas since last update
         int deltaForward = forwardPos - lastForwardOdoPos;
         int deltaRight = rightPos - lastRightOdoPos;
         
+        // Update last positions
         lastForwardOdoPos = forwardPos;
         lastRightOdoPos = rightPos;
         
+        // Convert encoder counts to inches
         double forwardInches = deltaForward / ODO_COUNTS_PER_INCH;
         double rightInches = deltaRight / ODO_COUNTS_PER_INCH;
         
+        // Get current and previous heading from IMU
         double currentHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+        double deltaHeading = currentHeading - robotHeading;
         
-        double robotDX = rightInches;
-        double robotDY = forwardInches;
+        // Normalize delta heading to [-PI, PI]
+        while (deltaHeading > Math.PI) deltaHeading -= 2 * Math.PI;
+        while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
         
-        double fieldDX = robotDX * Math.cos(currentHeading) - robotDY * Math.sin(currentHeading);
-        double fieldDY = robotDX * Math.sin(currentHeading) + robotDY * Math.cos(currentHeading);
+        // Calculate robot-centric displacement accounting for wheel offsets
+        double robotDX, robotDY;
         
+        if (Math.abs(deltaHeading) < 0.001) {
+            // No rotation - simple case
+            robotDX = rightInches;
+            robotDY = forwardInches;
+        } else {
+            // Robot rotated - account for arc motion of offset wheels
+            
+            // Forward wheel offset correction
+            double forwardWheelArcX = FORWARD_ODO_X_OFFSET * (Math.cos(deltaHeading) - 1) - 
+                                      FORWARD_ODO_Y_OFFSET * Math.sin(deltaHeading);
+            double forwardWheelArcY = FORWARD_ODO_X_OFFSET * Math.sin(deltaHeading) + 
+                                      FORWARD_ODO_Y_OFFSET * (Math.cos(deltaHeading) - 1);
+            
+            // Right wheel offset correction
+            double rightWheelArcX = RIGHT_ODO_X_OFFSET * (Math.cos(deltaHeading) - 1) - 
+                                    RIGHT_ODO_Y_OFFSET * Math.sin(deltaHeading);
+            double rightWheelArcY = RIGHT_ODO_X_OFFSET * Math.sin(deltaHeading) + 
+                                    RIGHT_ODO_Y_OFFSET * (Math.cos(deltaHeading) - 1);
+            
+            // Measured wheel travel minus the arc motion gives us the actual center displacement
+            double forwardCenterTravel = forwardInches - forwardWheelArcY;
+            double rightCenterTravel = rightInches - rightWheelArcX;
+            
+            // Combine measurements
+            robotDX = rightCenterTravel;
+            robotDY = forwardCenterTravel;
+        }
+        
+        // Convert to field-centric using the average heading during this movement
+        double avgHeading = robotHeading + deltaHeading / 2.0;
+        
+        double fieldDX = robotDX * Math.cos(avgHeading) - robotDY * Math.sin(avgHeading);
+        double fieldDY = robotDX * Math.sin(avgHeading) + robotDY * Math.cos(avgHeading);
+        
+        // Update global position (convert inches to feet)
         robotX += fieldDX / 12.0;
         robotY += fieldDY / 12.0;
         robotHeading = currentHeading;
