@@ -18,7 +18,7 @@ public class AutoTwoSpikeMarks extends LinearOpMode {
     
     // Motor power constants
     private static final double INTAKE_POWER = 1.0;
-    private static final double LAUNCH_MOTOR_POWER = 1.0;
+    private static final double LAUNCH_MOTOR_POWER = 0.6;  // Reduced for better accuracy
     private static final double RAMP_MOTOR_POWER = 1.0;
     
     // Navigation constants
@@ -50,13 +50,13 @@ public class AutoTwoSpikeMarks extends LinearOpMode {
     private static final double RED_TOP_SPIKE_X = -3.0;     // Top spike mark (same X)
     private static final double RED_TOP_SPIKE_Y = 1.0;      // Above center line
     
-    // Shooting position (align with red goal - upper left area)
-    private static final double RED_SHOOT_X = -4.5;
-    private static final double RED_SHOOT_Y = 2.5;
+    // Shooting position (at field center for AprilTag alignment)
+    private static final double RED_SHOOT_X = 0.0;
+    private static final double RED_SHOOT_Y = 0.0;
     
-    // Park position (red human player station - upper left corner)
-    private static final double RED_PARK_X = -5.5;
-    private static final double RED_PARK_Y = 5.0;
+    // Park position (red observation zone)
+    private static final double RED_PARK_X = -3.0;
+    private static final double RED_PARK_Y = -4.0;
     
     // Odometry tracking (will be set based on actual start position)
     private double robotX = 0;
