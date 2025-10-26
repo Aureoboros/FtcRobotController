@@ -1,10 +1,10 @@
 package org.firstinspires.ftc.teamcode;
+
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -15,7 +15,8 @@ import java.util.List;
 
 @TeleOp
 public class FieldCentricMecanumTeleOp extends LinearOpMode {
-    // Motor power constants - easy to tune without recompiling
+    
+    // ========== MOTOR POWER CONSTANTS ==========
     private static final double INTAKE_FULL_POWER = 1.0;
     private static final double INTAKE_HALF_POWER = 0.5;
     private static final double LAUNCH_MOTOR_POWER = 1.0;
@@ -23,116 +24,97 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
     private static final double SLOW_MODE_MULTIPLIER = 0.3;
     private static final double JOYSTICK_DEADZONE = 0.1;
     
-    // Robot physical dimensions (in inches)
-    private static final double ROBOT_LENGTH = 17.0;  // Back to front
-    private static final double ROBOT_WIDTH = 12.0;   // Left to right
-    
-    // Dead wheel odometry constants
+    // ========== DEAD WHEEL ODOMETRY CONSTANTS ==========
     private static final double ODO_COUNTS_PER_REV = 8192.0;  // REV Through Bore Encoder
     private static final double ODO_WHEEL_DIAMETER_INCHES = 1.26;  // 32mm converted
     private static final double ODO_COUNTS_PER_INCH = ODO_COUNTS_PER_REV / (ODO_WHEEL_DIAMETER_INCHES * Math.PI);
     
-    // Dead wheel positions relative to robot center (in inches)
-    // Measured positions: Both wheels ~3.5" back, forward wheel 1" left, right wheel 2.5" right
-    private static final double FORWARD_ODO_X_OFFSET = -1.0;  // 1" left of center
-    private static final double FORWARD_ODO_Y_OFFSET = -3.5;  // 3.5" back from center
-    private static final double RIGHT_ODO_X_OFFSET = 2.5;     // 2.5" right of center
-    private static final double RIGHT_ODO_Y_OFFSET = -3.5;    // 3.5" back from center
+    // Dead wheel positions relative to robot center (inches)
+    private static final double FORWARD_ODO_X_OFFSET = -1.0;
+    private static final double FORWARD_ODO_Y_OFFSET = -3.5;
+    private static final double RIGHT_ODO_X_OFFSET = 2.5;
+    private static final double RIGHT_ODO_Y_OFFSET = -3.5;
     
-    // Autonomous navigation constants
+    // ========== AUTONOMOUS NAVIGATION CONSTANTS ==========
     private static final double AUTO_MAX_SPEED = 0.7;
     private static final double AUTO_MIN_SPEED = 0.2;
     private static final double SLOWDOWN_DISTANCE_FEET = 1.0;
     private static final double POSITION_TOLERANCE_INCHES = 4.0;
     private static final double ANGLE_TOLERANCE_DEGREES = 3.0;
     
-    // Alliance positions (in feet from field center)
-    private static final double RED_TARGET_X = -6.0;
-    private static final double RED_TARGET_Y = -3.0;
-    private static final double BLUE_TARGET_X = 6.0;
-    private static final double BLUE_TARGET_Y = -3.0;
+    // ========== NAVIGATION TARGETS ==========
+    // Left Trigger: (0, -4) feet
+    private static final double LEFT_TRIGGER_TARGET_X = 0.0;
+    private static final double LEFT_TRIGGER_TARGET_Y = -4.0;
     
-    // AprilTag facing positions
-    private static final double RED_FACE_X = 6.0;
-    private static final double RED_FACE_Y = 6.0;
-    private static final double BLUE_FACE_X = -6.0;
-    private static final double BLUE_FACE_Y = 6.0;
+    // Right Trigger: (0, 0) feet (field center)
+    private static final double RIGHT_TRIGGER_TARGET_X = 0.0;
+    private static final double RIGHT_TRIGGER_TARGET_Y = 0.0;
     
-    // AprilTag IDs
+    // ========== APRILTAG CONFIGURATION ==========
     private static final int RED_APRILTAG_ID = 24;
     private static final int BLUE_APRILTAG_ID = 20;
     
-    // Servo positions
-    private static final double GATE_SERVO_DOWN = 0.0;
-    private static final double GATE_SERVO_UP = 0.417;  // 75 degrees (75/180)
-    
-    // Odometry variables
+    // ========== STATE VARIABLES ==========
     private double robotX = 0;  // in feet
     private double robotY = 0;  // in feet
     private double robotHeading = 0;  // in radians
     private int lastForwardOdoPos = 0;
     private int lastRightOdoPos = 0;
     
-    // Alliance selection
     private enum Alliance { NONE, RED, BLUE }
     private Alliance selectedAlliance = Alliance.NONE;
-    
-    // Autonomous navigation state
     private boolean autoNavigating = false;
+    private double targetX = 0;
+    private double targetY = 0;
     
-    // Vision
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
     
+    // ========== ALIGNMENT STATE ==========
+    private enum LaunchState { STOPPED, ALIGNING, RUNNING }
+    private LaunchState launchState = LaunchState.STOPPED;
+    
     @Override
     public void runOpMode() throws InterruptedException {
-        // Declare our motors
+        // ========== HARDWARE INITIALIZATION ==========
         DcMotor frontLeftMotor = hardwareMap.dcMotor.get("frontLeftMotor");
         DcMotor backLeftMotor = hardwareMap.dcMotor.get("backLeftMotor");
         DcMotor frontRightMotor = hardwareMap.dcMotor.get("frontRightMotor");
         DcMotor backRightMotor = hardwareMap.dcMotor.get("backRightMotor");
         
-        // Declare additional motors
         DcMotor intakeMotor = hardwareMap.dcMotor.get("intakeMotor");
-        DcMotor launchMotor1 = hardwareMap.dcMotor.get("launchMotor1");
-        DcMotor launchMotor2 = hardwareMap.dcMotor.get("launchMotor2");
+        DcMotor launchMotor = hardwareMap.dcMotor.get("launchMotor");
         DcMotor rampMotor = hardwareMap.dcMotor.get("rampMotor");
-
-        intakeMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        rampMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         
-        // Declare servo
-        Servo gateServo = hardwareMap.servo.get("GateServo");
-        
-        // Declare dead wheel encoders
+        // Dead wheel encoders
         DcMotor forwardOdo = hardwareMap.dcMotor.get("forwardOdo");
         DcMotor rightOdo = hardwareMap.dcMotor.get("rightOdo");
         
-        // Reset dead wheel encoders
+        // Reset encoders
         forwardOdo.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         rightOdo.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        
         forwardOdo.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         rightOdo.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         
-        // Motor safety - set zero power behavior to brake
+        // Motor modes
+        intakeMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        rampMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        
+        // Set brake behavior
         frontLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         frontRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         intakeMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        launchMotor1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        launchMotor2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        launchMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rampMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         
-        // Reverse the right side motors
+        // Reverse right side motors
         frontRightMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         backRightMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         
-        // Initialize servo
-        gateServo.setPosition(GATE_SERVO_DOWN);
-        
-        // Retrieve the IMU from the hardware map
+        // Initialize IMU
         IMU imu = hardwareMap.get(IMU.class, "imu");
         IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.UP,
@@ -148,39 +130,13 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
                 .addProcessor(aprilTag)
                 .build();
         
-        // INIT SETUP ROUTINE - Set safe starting positions
+        // ========== INIT SETUP ROUTINE ==========
         telemetry.addLine("========================================");
         telemetry.addLine("INITIALIZING ROBOT");
         telemetry.addLine("========================================");
-        telemetry.addData("Dimensions", "17\" x 12\" (L x W)");
-        telemetry.addData("Hub Location", "Rear");
-        telemetry.update();
-        
-        // Set servos to safe positions
-        gateServo.setPosition(GATE_SERVO_DOWN);
-        telemetry.addData("Gate Servo", "DOWN (safe position)");
-        telemetry.update();
-        sleep(200);
-        
-        // Verify IMU is ready
         telemetry.addData("IMU Status", "Initialized");
-        telemetry.addData("IMU Heading", "%.2f degrees", 
-            imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES));
-        telemetry.update();
-        sleep(200);
-        
-        // Verify dead wheels are reset
-        telemetry.addData("Forward Odometry", "Reset to 0");
-        telemetry.addData("Right Odometry", "Reset to 0");
-        telemetry.addData("Odo Position", "Rear of robot");
-        telemetry.update();
-        sleep(200);
-        
-        // Verify camera is ready
+        telemetry.addData("Odometry", "Reset to 0");
         telemetry.addData("Camera Status", visionPortal.getCameraState());
-        telemetry.update();
-        sleep(200);
-        
         telemetry.addLine("========================================");
         telemetry.addLine("✓ ROBOT READY");
         telemetry.addLine("Press START to begin");
@@ -193,12 +149,10 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
         
         // Toggle states
         boolean slowMode = false;
-        boolean dpadControlEnabled = false;
+        boolean dpadControlEnabled = true;  // Always active per README
         boolean intakeHalfSpeed = false;
         boolean intakeForwardActive = false;
         boolean intakeReverseActive = false;
-        boolean launchMotorsActive = false;
-        boolean detailedTelemetry = false;
         
         waitForStart();
         if (isStopRequested()) return;
@@ -207,30 +161,33 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
         rampMotor.setPower(RAMP_MOTOR_POWER);
         
         while (opModeIsActive()) {
-            // Store the previous gamepad state
+            // Store previous gamepad state
             previousGamepad1.copy(currentGamepad1);
             currentGamepad1.copy(gamepad1);
             
             // Update odometry
             updateOdometry(forwardOdo, rightOdo, imu);
             
-            // Alliance selection with triggers
-            if (currentGamepad1.left_trigger > 0.5 && previousGamepad1.left_trigger <= 0.5) {
+            // ========== ALLIANCE SELECTION ==========
+            if (currentGamepad1.left_bumper && !previousGamepad1.left_bumper) {
                 selectedAlliance = Alliance.RED;
-            } else if (currentGamepad1.right_trigger > 0.5 && previousGamepad1.right_trigger <= 0.5) {
+            } else if (currentGamepad1.right_bumper && !previousGamepad1.right_bumper) {
                 selectedAlliance = Alliance.BLUE;
             }
             
-            // Left bumper - navigate to alliance position
-            if (currentGamepad1.left_bumper && !previousGamepad1.left_bumper && selectedAlliance != Alliance.NONE) {
+            // ========== AUTONOMOUS NAVIGATION ==========
+            // Left Trigger - navigate to (0, -4)
+            if (currentGamepad1.left_trigger > 0.5 && previousGamepad1.left_trigger <= 0.5) {
                 autoNavigating = true;
+                targetX = LEFT_TRIGGER_TARGET_X;
+                targetY = LEFT_TRIGGER_TARGET_Y;
             }
             
-            // Right bumper - gate servo flick
-            if (currentGamepad1.right_bumper) {
-                gateServo.setPosition(GATE_SERVO_UP);
-            } else {
-                gateServo.setPosition(GATE_SERVO_DOWN);
+            // Right Trigger - navigate to (0, 0)
+            if (currentGamepad1.right_trigger > 0.5 && previousGamepad1.right_trigger <= 0.5) {
+                autoNavigating = true;
+                targetX = RIGHT_TRIGGER_TARGET_X;
+                targetY = RIGHT_TRIGGER_TARGET_Y;
             }
             
             // Check for driver override
@@ -246,7 +203,7 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
             
             if (autoNavigating) {
                 // Autonomous navigation
-                double[] navOutput = navigateToAlliance(selectedAlliance, imu);
+                double[] navOutput = navigateToTarget(targetX, targetY, imu);
                 x = navOutput[0];
                 y = navOutput[1];
                 rx = navOutput[2];
@@ -256,7 +213,7 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
                     autoNavigating = false;
                 }
             } else {
-                // Manual control
+                // ========== MANUAL CONTROL ==========
                 y = -currentGamepad1.left_stick_y;
                 x = currentGamepad1.left_stick_x;
                 rx = currentGamepad1.right_stick_x;
@@ -266,48 +223,44 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
                 x = applyDeadzone(x);
                 rx = applyDeadzone(rx);
                 
-                // D-pad control
-                if (currentGamepad1.back && !previousGamepad1.back) {
-                    dpadControlEnabled = !dpadControlEnabled;
+                // D-pad control (always active with slow mode)
+                if (currentGamepad1.dpad_up) {
+                    y = SLOW_MODE_MULTIPLIER;
+                } else if (currentGamepad1.dpad_down) {
+                    y = -SLOW_MODE_MULTIPLIER;
+                }
+                if (currentGamepad1.dpad_right) {
+                    x = SLOW_MODE_MULTIPLIER;
+                } else if (currentGamepad1.dpad_left) {
+                    x = -SLOW_MODE_MULTIPLIER;
                 }
                 
-                if (dpadControlEnabled) {
-                    if (currentGamepad1.dpad_up) y = 1.0;
-                    else if (currentGamepad1.dpad_down) y = -1.0;
-                    if (currentGamepad1.dpad_right) x = 1.0;
-                    else if (currentGamepad1.dpad_left) x = -1.0;
-                }
-                
-                // Toggle slow mode
+                // Toggle slow mode with Y button
                 if (currentGamepad1.y && !previousGamepad1.y) {
                     slowMode = !slowMode;
                 }
+                
+                // Apply slow mode to joystick input
+                if (slowMode) {
+                    y *= SLOW_MODE_MULTIPLIER;
+                    x *= SLOW_MODE_MULTIPLIER;
+                }
             }
             
-            double translationMultiplier = 1.0;
-            
-            // Reset IMU
-            if (currentGamepad1.options && !previousGamepad1.options) {
+            // ========== IMU RESET ==========
+            if (currentGamepad1.back && !previousGamepad1.back) {
                 imu.resetYaw();
-                // Also reset odometry position when IMU is reset
                 robotX = 0;
                 robotY = 0;
                 robotHeading = 0;
             }
             
-            // Toggle detailed telemetry
-            if (currentGamepad1.start && !previousGamepad1.start) {
-                detailedTelemetry = !detailedTelemetry;
-            }
-            
+            // ========== FIELD-CENTRIC TRANSFORMATION ==========
             double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-            
-            // Field-centric transformation
             double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
             double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
             
-            rotX = rotX * 1.1 * translationMultiplier;
-            rotY = rotY * translationMultiplier;
+            rotX = rotX * 1.1;  // Strafe correction
             
             // Calculate motor powers
             double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx), 1);
@@ -321,16 +274,19 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
             frontRightMotor.setPower(frontRightPower);
             backRightMotor.setPower(backRightPower);
             
-            // Toggle intake speed mode
-            if (currentGamepad1.guide && !previousGamepad1.guide) {
+            // ========== INTAKE CONTROL ==========
+            // Toggle intake speed with START button
+            if (currentGamepad1.start && !previousGamepad1.start) {
                 intakeHalfSpeed = !intakeHalfSpeed;
             }
             
-            // Intake control
+            // B button - toggle intake forward
             if (currentGamepad1.b && !previousGamepad1.b) {
                 intakeForwardActive = !intakeForwardActive;
                 if (intakeForwardActive) intakeReverseActive = false;
             }
+            
+            // A button - toggle intake reverse
             if (currentGamepad1.a && !previousGamepad1.a) {
                 intakeReverseActive = !intakeReverseActive;
                 if (intakeReverseActive) intakeForwardActive = false;
@@ -341,98 +297,74 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
             if (intakeForwardActive) {
                 double speedToUse = intakeHalfSpeed ? INTAKE_HALF_POWER : INTAKE_FULL_POWER;
                 intakePower = speedToUse;
-                intakeStatus = "FORWARD (" + (intakeHalfSpeed ? "HALF" : "FULL") + ")";
+                intakeStatus = "FORWARD (" + (intakeHalfSpeed ? "50%" : "100%") + ")";
             } else if (intakeReverseActive) {
                 double speedToUse = intakeHalfSpeed ? INTAKE_HALF_POWER : INTAKE_FULL_POWER;
                 intakePower = -speedToUse;
-                intakeStatus = "REVERSE (" + (intakeHalfSpeed ? "HALF" : "FULL") + ")";
+                intakeStatus = "REVERSE (" + (intakeHalfSpeed ? "50%" : "100%") + ")";
             }
             intakeMotor.setPower(intakePower);
             
-            // Launch motors
+            // ========== LAUNCH MOTOR WITH APRILTAG ALIGNMENT ==========
             if (currentGamepad1.x && !previousGamepad1.x) {
-                launchMotorsActive = !launchMotorsActive;
+                if (launchState == LaunchState.STOPPED) {
+                    if (selectedAlliance != Alliance.NONE) {
+                        launchState = LaunchState.ALIGNING;
+                    }
+                } else {
+                    launchState = LaunchState.STOPPED;
+                }
             }
             
-            double launch1Power = 0;
-            double launch2Power = 0;
+            double launchPower = 0;
             String launchStatus = "STOPPED";
-            if (launchMotorsActive) {
-                launch1Power = LAUNCH_MOTOR_POWER;
-                launch2Power = -LAUNCH_MOTOR_POWER;
+            
+            if (launchState == LaunchState.ALIGNING) {
+                int targetTag = (selectedAlliance == Alliance.RED) ? RED_APRILTAG_ID : BLUE_APRILTAG_ID;
+                AprilTagDetection detection = getAprilTagDetection(targetTag);
+                
+                if (detection != null) {
+                    double yawError = detection.ftcPose.yaw;
+                    if (Math.abs(yawError) < ANGLE_TOLERANCE_DEGREES) {
+                        launchState = LaunchState.RUNNING;
+                    } else {
+                        // Still aligning - rotate robot
+                        rx = Math.signum(yawError) * 0.3;
+                        launchStatus = "ALIGNING";
+                    }
+                } else {
+                    launchStatus = "ALIGNING (No Tag)";
+                }
+            }
+            
+            if (launchState == LaunchState.RUNNING) {
+                launchPower = -LAUNCH_MOTOR_POWER;  // Counter-clockwise
                 launchStatus = "RUNNING";
             }
-            launchMotor1.setPower(launch1Power);
-            launchMotor2.setPower(launch2Power);
             
-            // Telemetry
-            if (detailedTelemetry) {
-                // DEBUG MODE
-                telemetry.addLine("========== DEBUG MODE ==========");
-                telemetry.addLine();
-                
-                telemetry.addLine("=== ROBOT CONFIG ===");
-                telemetry.addData("Dimensions", "17\" x 12\"");
-                telemetry.addData("Hub Position", "Rear");
-                telemetry.addLine();
-                
-                telemetry.addLine("=== ALLIANCE & NAVIGATION ===");
-                telemetry.addData("Selected Alliance", selectedAlliance);
-                telemetry.addData("Auto Navigation", autoNavigating ? "ACTIVE" : "INACTIVE");
-                telemetry.addData("Robot Position", "X: %.2f ft, Y: %.2f ft", robotX, robotY);
-                telemetry.addData("Robot Heading", "%.2f°", Math.toDegrees(robotHeading));
-                telemetry.addLine();
-                
-                telemetry.addLine("=== DRIVE MODES ===");
-                telemetry.addData("Slow Mode", slowMode ? "ENABLED" : "DISABLED");
-                telemetry.addData("D-pad Control", dpadControlEnabled ? "ENABLED" : "DISABLED");
-                telemetry.addLine();
-                
-                telemetry.addLine("=== MOTOR STATUS ===");
-                telemetry.addData("Intake", intakeStatus);
-                telemetry.addData("Intake Speed Mode", intakeHalfSpeed ? "HALF POWER" : "FULL POWER");
-                telemetry.addData("Launch Motors", launchStatus);
-                telemetry.addData("Ramp Motor", "RUNNING");
-                telemetry.addData("Gate Servo", currentGamepad1.right_bumper ? "UP (75°)" : "DOWN (0°)");
-                telemetry.addLine();
-                
-                telemetry.addLine("=== MOTOR POWERS ===");
-                telemetry.addData("FL/FR", "%.2f / %.2f", frontLeftPower, frontRightPower);
-                telemetry.addData("BL/BR", "%.2f / %.2f", backLeftPower, backRightPower);
-                telemetry.addData("Intake", "%.2f", intakePower);
-                telemetry.addData("Launch 1/2", "%.2f / %.2f", launch1Power, launch2Power);
-                telemetry.addLine();
-                
-                telemetry.addLine("=== ODOMETRY ===");
-                telemetry.addData("Forward Odo", forwardOdo.getCurrentPosition());
-                telemetry.addData("Right Odo", rightOdo.getCurrentPosition());
-            } else {
-                // MATCH MODE
-                telemetry.addLine("========== MATCH MODE ==========");
-                telemetry.addLine();
-                
-                telemetry.addData("Alliance", selectedAlliance);
-                telemetry.addData("Position", "X: %.1f  Y: %.1f ft", robotX, robotY);
-                telemetry.addData("Heading", "%.0f°", Math.toDegrees(robotHeading));
-                telemetry.addLine();
-                
-                telemetry.addData("Intake", intakeStatus);
-                telemetry.addData("Launch", launchStatus);
-                telemetry.addData("Gate", currentGamepad1.right_bumper ? "OPEN" : "CLOSED");
-                telemetry.addLine();
-                
-                if (autoNavigating) {
-                    telemetry.addData("AUTO NAV", ">>> ACTIVE <<<");
-                }
-                
-                if (slowMode) {
-                    telemetry.addData("Drive Mode", "SLOW");
-                }
+            launchMotor.setPower(launchPower);
+            
+            // ========== TELEMETRY ==========
+            telemetry.addLine("========== MATCH MODE ==========");
+            telemetry.addLine();
+            
+            telemetry.addData("Alliance", selectedAlliance);
+            telemetry.addData("Position", "X: %.1f  Y: %.1f ft", robotX, robotY);
+            telemetry.addData("Heading", "%.0f°", Math.toDegrees(robotHeading));
+            telemetry.addLine();
+            
+            telemetry.addData("Intake", intakeStatus);
+            telemetry.addData("Launch", launchStatus);
+            telemetry.addLine();
+            
+            if (autoNavigating) {
+                telemetry.addData("AUTO NAV", ">>> ACTIVE <<<");
+                telemetry.addData("Target", "X: %.1f  Y: %.1f ft", targetX, targetY);
             }
             
-            telemetry.addLine();
-            telemetry.addData("Telemetry Mode", detailedTelemetry ? "DEBUG" : "MATCH");
-            telemetry.addData("Toggle", "Press START button");
+            if (slowMode) {
+                telemetry.addData("Drive Mode", "SLOW (30%)");
+            }
             
             telemetry.update();
         }
@@ -442,70 +374,51 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
     }
     
     private void updateOdometry(DcMotor forwardOdo, DcMotor rightOdo, IMU imu) {
-        // Read current encoder positions
         int forwardPos = forwardOdo.getCurrentPosition();
         int rightPos = rightOdo.getCurrentPosition();
         
-        // Calculate deltas since last update
         int deltaForward = forwardPos - lastForwardOdoPos;
         int deltaRight = rightPos - lastRightOdoPos;
         
-        // Update last positions
         lastForwardOdoPos = forwardPos;
         lastRightOdoPos = rightPos;
         
-        // Convert encoder counts to inches
         double forwardInches = deltaForward / ODO_COUNTS_PER_INCH;
         double rightInches = deltaRight / ODO_COUNTS_PER_INCH;
         
-        // Get current and previous heading from IMU
         double currentHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
         double deltaHeading = currentHeading - robotHeading;
         
-        // Normalize delta heading to [-PI, PI]
+        // Normalize delta heading
         while (deltaHeading > Math.PI) deltaHeading -= 2 * Math.PI;
         while (deltaHeading < -Math.PI) deltaHeading += 2 * Math.PI;
         
-        // Calculate robot-centric displacement accounting for wheel offsets
         double robotDX, robotDY;
         
         if (Math.abs(deltaHeading) < 0.001) {
-            // No rotation - simple case
             robotDX = rightInches;
             robotDY = forwardInches;
         } else {
-            // Robot rotated - account for arc motion of offset wheels
-            // When robot rotates, wheels trace arcs. We need to calculate the center of rotation's movement
-            
-            // Calculate the displacement of each wheel's mounting point due to rotation
-            // Using arc length = radius * angle for small angles, but accounting for the full motion
-            
-            // Forward wheel offset correction
+            // Account for wheel offset during rotation
             double forwardWheelArcX = FORWARD_ODO_X_OFFSET * (Math.cos(deltaHeading) - 1) - 
                                       FORWARD_ODO_Y_OFFSET * Math.sin(deltaHeading);
             double forwardWheelArcY = FORWARD_ODO_X_OFFSET * Math.sin(deltaHeading) + 
                                       FORWARD_ODO_Y_OFFSET * (Math.cos(deltaHeading) - 1);
             
-            // Right wheel offset correction
             double rightWheelArcX = RIGHT_ODO_X_OFFSET * (Math.cos(deltaHeading) - 1) - 
                                     RIGHT_ODO_Y_OFFSET * Math.sin(deltaHeading);
             double rightWheelArcY = RIGHT_ODO_X_OFFSET * Math.sin(deltaHeading) + 
                                     RIGHT_ODO_Y_OFFSET * (Math.cos(deltaHeading) - 1);
             
-            // Measured wheel travel minus the arc motion gives us the actual center displacement
             double forwardCenterTravel = forwardInches - forwardWheelArcY;
             double rightCenterTravel = rightInches - rightWheelArcX;
             
-            // Combine measurements (averaging if both wheels measure same direction)
-            // Forward wheel primarily measures Y, right wheel primarily measures X
             robotDX = rightCenterTravel;
             robotDY = forwardCenterTravel;
         }
         
-        // Convert to field-centric using the average heading during this movement
-        // Use the midpoint heading for better accuracy
+        // Convert to field-centric
         double avgHeading = robotHeading + deltaHeading / 2.0;
-        
         double fieldDX = robotDX * Math.cos(avgHeading) - robotDY * Math.sin(avgHeading);
         double fieldDY = robotDX * Math.sin(avgHeading) + robotDY * Math.cos(avgHeading);
         
@@ -515,13 +428,7 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
         robotHeading = currentHeading;
     }
     
-    private double[] navigateToAlliance(Alliance alliance, IMU imu) {
-        double targetX = (alliance == Alliance.RED) ? RED_TARGET_X : BLUE_TARGET_X;
-        double targetY = (alliance == Alliance.RED) ? RED_TARGET_Y : BLUE_TARGET_Y;
-        double faceX = (alliance == Alliance.RED) ? RED_FACE_X : BLUE_FACE_X;
-        double faceY = (alliance == Alliance.RED) ? RED_FACE_Y : BLUE_FACE_Y;
-        int targetTag = (alliance == Alliance.RED) ? RED_APRILTAG_ID : BLUE_APRILTAG_ID;
-        
+    private double[] navigateToTarget(double targetX, double targetY, IMU imu) {
         double deltaX = targetX - robotX;
         double deltaY = targetY - robotY;
         double distanceToTarget = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -531,31 +438,7 @@ public class FieldCentricMecanumTeleOp extends LinearOpMode {
         
         // Check if at position
         if (distanceToTarget * 12 < POSITION_TOLERANCE_INCHES) {
-            // At position, now align to AprilTag
-            AprilTagDetection targetDetection = getAprilTagDetection(targetTag);
-            if (targetDetection != null) {
-                double yawError = targetDetection.ftcPose.yaw;
-                if (Math.abs(yawError) < ANGLE_TOLERANCE_DEGREES) {
-                    completed = 1;
-                } else {
-                    rx = Math.signum(yawError) * 0.3;
-                }
-            } else {
-                // No AprilTag visible, use geometric facing
-                double desiredAngle = Math.atan2(faceX - robotX, faceY - robotY);
-                double currentAngle = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-                double angleError = desiredAngle - currentAngle;
-                
-                // Normalize angle
-                while (angleError > Math.PI) angleError -= 2 * Math.PI;
-                while (angleError < -Math.PI) angleError += 2 * Math.PI;
-                
-                if (Math.abs(Math.toDegrees(angleError)) < ANGLE_TOLERANCE_DEGREES) {
-                    completed = 1;
-                } else {
-                    rx = Math.signum(angleError) * 0.3;
-                }
-            }
+            completed = 1;
         } else {
             // Navigate to position
             double angleToTarget = Math.atan2(deltaX, deltaY);
