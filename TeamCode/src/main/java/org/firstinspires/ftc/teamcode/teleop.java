@@ -14,7 +14,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
 
 @TeleOp
-public class FieldCentricMecanumTeleOp extends LinearOpMode {
+public class teleop extends LinearOpMode {
     
     // ========== MOTOR POWER CONSTANTS ==========
     private static final double INTAKE_FULL_POWER = 1.0;
