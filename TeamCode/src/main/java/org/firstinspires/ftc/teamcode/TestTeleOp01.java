@@ -5,7 +5,6 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.util.Range;
 import org.firstinspires.ftc.vision.VisionPortal;
@@ -14,8 +13,47 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
 // yummy yummy cheesecake for our scrumptious souls. i will sell my organs for cheesecake. i am sorry, i was possessed by the demons.
 
+/**
+ * MECANUM WHEEL PROGRAMMING GUIDE
+ * ================================
+ * 
+ * HOW MECANUM WHEELS WORK:
+ * - Mecanum wheels have rollers mounted at 45-degree angles
+ * - By spinning wheels in different combinations, the robot can move in any direction
+ * - The key is combining three inputs: forward/backward, strafe, and rotation
+ * 
+ * BASIC MECANUM DRIVE FORMULA:
+ * - Front Left  = y + x + rx
+ * - Front Right = y - x - rx
+ * - Back Left   = y - x + rx
+ * - Back Right  = y + x - rx
+ * 
+ * WHERE:
+ * - y  = Forward/Backward (-1.0 to +1.0)
+ * - x  = Strafe Left/Right (-1.0 to +1.0)
+ * - rx = Rotation (-1.0 to +1.0)
+ * 
+ * EXAMPLES:
+ * - Move Forward: y=1, x=0, rx=0 → All wheels = 1 (all forward)
+ * - Strafe Right: y=0, x=1, rx=0 → FL=1, FR=-1, BL=-1, BR=1
+ * - Rotate CW:    y=0, x=0, rx=1 → Left=1, Right=-1
+ * 
+ * IMPORTANT STEPS:
+ * 1. Set motor directions correctly (left=FORWARD, right=REVERSE typically)
+ * 2. Calculate wheel powers using the formula above
+ * 3. Normalize powers if any exceed 1.0 (maintains direction and ratios)
+ * 4. Apply power limits and clipping
+ * 5. Set motor powers
+ * 
+ * TROUBLESHOOTING:
+ * - If robot moves wrong direction: Reverse motor directions
+ * - If strafing doesn't work: Check wheel roller orientation
+ * - If movement is jerky: Add deadzone to joystick inputs
+ * - If robot drifts: Consider field-centric drive (see code comments)
+ */
+
 @TeleOp
-public class testtelop01 extends LinearOpMode {
+public class TestTeleOp01 extends LinearOpMode {
     // ========== MOTOR POWER CONSTANTS ==========
     private static final double INTAKE_FULL_POWER = 1.0;
     private static final double INTAKE_HALF_POWER = 0.5;
@@ -49,6 +87,10 @@ public class testtelop01 extends LinearOpMode {
 
     // ========== APRILTAG AUTO-ALIGNMENT STATE ==========
     private boolean autoAligning = false;
+    
+    // ========== WHEEL TEST MODE ==========
+    private boolean wheelTestMode = false;
+    private static final double TEST_WHEEL_POWER = 0.5;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -61,7 +103,13 @@ public class testtelop01 extends LinearOpMode {
         DcMotor launchMotor = hardwareMap.dcMotor.get("launchMotor");
         DcMotor rampMotor = hardwareMap.dcMotor.get("rampMotor");
 
-        // Set motor directions
+        // ========== SET MECANUM MOTOR DIRECTIONS ==========
+        // Mecanum wheels require specific motor directions for proper movement.
+        // Typical configuration:
+        // - Left side motors: FORWARD (positive power = forward movement)
+        // - Right side motors: REVERSE (positive power = forward movement)
+        // This setup allows the mecanum formula to work correctly.
+        // If your robot moves incorrectly, you may need to reverse these directions.
         frontLeftMotor.setDirection(DcMotorSimple.Direction.FORWARD);
         backLeftMotor.setDirection(DcMotorSimple.Direction.FORWARD);
         frontRightMotor.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -145,21 +193,38 @@ public class testtelop01 extends LinearOpMode {
             previousGamepad2.copy(currentGamepad2);
             currentGamepad2.copy(gamepad2);
 
+            // ========== WHEEL TEST MODE TOGGLE (BOTH BUMPERS PRESSED) ==========
+            if ((currentGamepad1.left_bumper && currentGamepad1.right_bumper && 
+                 !(previousGamepad1.left_bumper && previousGamepad1.right_bumper)) ||
+                (currentGamepad2.left_bumper && currentGamepad2.right_bumper && 
+                 !(previousGamepad2.left_bumper && previousGamepad2.right_bumper))) {
+                wheelTestMode = !wheelTestMode;
+                if (wheelTestMode) {
+                    autoAligning = false; // Disable auto-align in test mode
+                }
+            }
+            
             // ========== ALLIANCE SELECTION (BOTH GAMEPADS) ==========
-            if ((currentGamepad1.left_bumper && !previousGamepad1.left_bumper) ||
-                    (currentGamepad2.left_bumper && !previousGamepad2.left_bumper)) {
-                selectedAlliance = Alliance.RED;
-            } else if ((currentGamepad1.right_bumper && !previousGamepad1.right_bumper) ||
-                    (currentGamepad2.right_bumper && !previousGamepad2.right_bumper)) {
-                selectedAlliance = Alliance.BLUE;
+            // Only allow alliance selection when not in test mode
+            if (!wheelTestMode) {
+                if ((currentGamepad1.left_bumper && !previousGamepad1.left_bumper && !currentGamepad1.right_bumper) ||
+                        (currentGamepad2.left_bumper && !previousGamepad2.left_bumper && !currentGamepad2.right_bumper)) {
+                    selectedAlliance = Alliance.RED;
+                } else if ((currentGamepad1.right_bumper && !previousGamepad1.right_bumper && !currentGamepad1.left_bumper) ||
+                        (currentGamepad2.right_bumper && !previousGamepad2.right_bumper && !currentGamepad2.left_bumper)) {
+                    selectedAlliance = Alliance.BLUE;
+                }
             }
 
             // ========== LEFT TRIGGER - APRILTAG AUTO-ALIGNMENT (BOTH GAMEPADS) ==========
-            if (currentGamepad1.left_trigger > 0.5 || currentGamepad2.left_trigger > 0.5) {
-                if (selectedAlliance != Alliance.NONE) {
-                    autoAligning = true;
-                } else {
-                    autoAligning = false;
+            // Disabled in test mode
+            if (!wheelTestMode) {
+                if (currentGamepad1.left_trigger > 0.5 || currentGamepad2.left_trigger > 0.5) {
+                    if (selectedAlliance != Alliance.NONE) {
+                        autoAligning = true;
+                    } else {
+                        autoAligning = false;
+                    }
                 }
             }
 
@@ -223,60 +288,31 @@ public class testtelop01 extends LinearOpMode {
                 // Allow manual translation during auto-alignment
                 if (GAMEPAD1_ACTIVE) {
                     y = -currentGamepad1.left_stick_y;
-                    frontLeftMotor.setPower(y);
-                    frontRightMotor.setPower(y);
-                    backLeftMotor.setPower(y);
-                    backRightMotor.setPower(y);
                     x = currentGamepad1.left_stick_x;
-                    frontLeftMotor.setPower(x);
-                    frontRightMotor.setPower(-x);
-                    backLeftMotor.setPower(-x);
-                    backRightMotor.setPower(x);
                     maxDrivePower = GAMEPAD1_MAX_POWER;
                     activeDriver = "DRIVER 1";
                 } else if (GAMEPAD2_ACTIVE) {
                     y = -currentGamepad2.left_stick_y;
-                    frontLeftMotor.setPower(y);
-                    frontRightMotor.setPower(y);
-                    backLeftMotor.setPower(y);
-                    backRightMotor.setPower(y);
                     x = currentGamepad2.left_stick_x;
-                    frontLeftMotor.setPower(x);
-                    frontRightMotor.setPower(-x);
-                    backLeftMotor.setPower(-x);
-                    backRightMotor.setPower(x);
                     maxDrivePower = GAMEPAD2_MAX_POWER;
                     activeDriver = "DRIVER 2";
                 }
 
+                // Apply deadzone
                 y = applyDeadzone(y);
                 x = applyDeadzone(x);
             } else {
                 // ========== MANUAL CONTROL ==========
                 if (GAMEPAD1_ACTIVE) {
                     y = -currentGamepad1.left_stick_y;
-                    frontLeftMotor.setPower(y);
-                    frontRightMotor.setPower(y);
-                    backLeftMotor.setPower(y);
-                    backRightMotor.setPower(y);
                     x = currentGamepad1.left_stick_x;
-                    frontLeftMotor.setPower(x);
-                    frontRightMotor.setPower(-x);
-                    backLeftMotor.setPower(-x);
-                    backRightMotor.setPower(x);
+                    rx = currentGamepad1.right_stick_x;
                     maxDrivePower = GAMEPAD1_MAX_POWER;
                     activeDriver = "DRIVER 1";
                 } else if (GAMEPAD2_ACTIVE) {
                     y = -currentGamepad2.left_stick_y;
-                    frontLeftMotor.setPower(y);
-                    frontRightMotor.setPower(y);
-                    backLeftMotor.setPower(y);
-                    backRightMotor.setPower(y);
                     x = currentGamepad2.left_stick_x;
-                    frontLeftMotor.setPower(x);
-                    frontRightMotor.setPower(-x);
-                    backLeftMotor.setPower(-x);
-                    backRightMotor.setPower(x);
+                    rx = currentGamepad2.right_stick_x;
                     maxDrivePower = GAMEPAD2_MAX_POWER;
                     activeDriver = "DRIVER 2";
                 }
@@ -315,58 +351,152 @@ public class testtelop01 extends LinearOpMode {
                 backRightMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
             }
 
-            // ========== FIELD-CENTRIC TRANSFORMATION ==========
-//            double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-//            double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
-//            double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
-//            rotX = rotX * 1.1;  // Strafe correction
+            // ========== WHEEL POWER VARIABLES (DECLARED FOR TELEMETRY) ==========
+            double frontLeftPower = 0;
+            double frontRightPower = 0;
+            double backLeftPower = 0;
+            double backRightPower = 0;
 
-            // ========== POWER NORMALIZATION (CRITICAL FIX) ==========
-            // Changed back to rx
-            double frontLeftPower = rx;
-            double backLeftPower = rx;
-            double frontRightPower = -rx;
-            double backRightPower = -rx;
+            // ========== WHEEL TEST MODE ==========
+            // In test mode, control individual wheels with joysticks
+            if (wheelTestMode) {
+                // Use gamepad1 or gamepad2 for test mode
+                Gamepad testGamepad = GAMEPAD1_ACTIVE ? currentGamepad1 : currentGamepad2;
+                
+                // Left stick Y: Front Left wheel (push forward = positive, pull back = negative)
+                double frontLeftInput = -testGamepad.left_stick_y;
+                // Left stick X: Front Right wheel (push right = positive, push left = negative)
+                double frontRightInput = testGamepad.left_stick_x;
+                // Right stick Y: Back Left wheel (push forward = positive, pull back = negative)
+                double backLeftInput = -testGamepad.right_stick_y;
+                // Right stick X: Back Right wheel (push right = positive, push left = negative)
+                double backRightInput = testGamepad.right_stick_x;
+                
+                // Apply deadzone and scale to test power
+                frontLeftPower = applyDeadzone(frontLeftInput) * TEST_WHEEL_POWER;
+                frontRightPower = applyDeadzone(frontRightInput) * TEST_WHEEL_POWER;
+                backLeftPower = applyDeadzone(backLeftInput) * TEST_WHEEL_POWER;
+                backRightPower = applyDeadzone(backRightInput) * TEST_WHEEL_POWER;
+                
+                // Apply test mode powers directly
+                frontLeftMotor.setPower(Range.clip(frontLeftPower, -1.0, 1.0));
+                frontRightMotor.setPower(Range.clip(frontRightPower, -1.0, 1.0));
+                backLeftMotor.setPower(Range.clip(backLeftPower, -1.0, 1.0));
+                backRightMotor.setPower(Range.clip(backRightPower, -1.0, 1.0));
+                
+                // Skip normal drive calculations in test mode
+                // Continue to telemetry section
+            } else {
+                // ========== MECANUM DRIVE POWER CALCULATION ==========
+                // MECANUM WHEELS EXPLANATION:
+                // Mecanum wheels have rollers mounted at 45-degree angles.
+                // By spinning wheels in different combinations, the robot can:
+                // - Move forward/backward (all wheels same direction)
+                // - Strafe left/right (diagonal wheels spin opposite)
+                // - Rotate (left and right sides spin opposite)
+                // - Combine all three movements simultaneously
+                //
+                // WHEEL ORIENTATION (typical setup):
+                // Front Left:  Rollers pointing from top-left to bottom-right  (\)
+                // Front Right: Rollers pointing from top-right to bottom-left  (/)
+                // Back Left:   Rollers pointing from top-right to bottom-left  (/)
+                // Back Right:  Rollers pointing from top-left to bottom-right  (\)
+                //
+                // INPUT VALUES:
+                // y  = Forward/Backward: -1.0 (back) to +1.0 (forward)
+                // x  = Strafe Left/Right: -1.0 (left) to +1.0 (right)
+                // rx = Rotation: -1.0 (counter-clockwise) to +1.0 (clockwise)
+                //
+                // MECANUM DRIVE FORMULA:
+                // Each wheel power is a combination of all three inputs:
+                frontLeftPower = y + x + rx;   // Forward + Strafe Right + Rotate Clockwise
+                frontRightPower = y - x - rx;  // Forward - Strafe Right - Rotate Clockwise
+                backLeftPower = y - x + rx;    // Forward - Strafe Right + Rotate Clockwise
+                backRightPower = y + x - rx;   // Forward + Strafe Right - Rotate Clockwise
+                //
+                // HOW IT WORKS:
+                // - Pure Forward (y=1, x=0, rx=0): All wheels spin forward
+                // - Pure Strafe Right (y=0, x=1, rx=0): FL and BR forward, FR and BL backward
+                // - Pure Rotate (y=0, x=0, rx=1): Left wheels forward, right wheels backward
+                // - Combinations: Add all three movements together
+                
+                // ========== FIELD-CENTRIC DRIVE (OPTIONAL) ==========
+                // Uncomment below to enable field-centric drive (robot moves relative to field, not robot)
+                // Field-centric means: Forward always moves toward opponent wall, regardless of robot rotation
+                /*
+                double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+                // Rotate the input vector by the negative of the robot's heading
+                double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
+                double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
+                // Optional: Strafe correction factor (adjust if strafing is slower than forward)
+                rotX = rotX * 1.1;  // Strafe correction (adjust based on testing)
+                // Use rotated values in mecanum formula
+                frontLeftPower = rotY + rotX + rx;
+                frontRightPower = rotY - rotX - rx;
+                backLeftPower = rotY - rotX + rx;
+                backRightPower = rotY + rotX - rx;
+                */
 
-            // Find the maximum absolute power
-            double maxPower = Math.abs(frontLeftPower);
-            maxPower = Math.max(maxPower, Math.abs(backLeftPower));
-            maxPower = Math.max(maxPower, Math.abs(frontRightPower));
-            maxPower = Math.max(maxPower, Math.abs(backRightPower));
+                // ========== POWER NORMALIZATION ==========
+                // WHY NORMALIZE?
+                // When combining y, x, and rx, some wheel powers can exceed 1.0.
+                // Example: y=1.0, x=1.0, rx=1.0 → frontLeftPower = 3.0 (exceeds max!)
+                // We must normalize to keep all powers between -1.0 and 1.0 while
+                // preserving the correct direction and relative speeds.
+                //
+                // HOW IT WORKS:
+                // 1. Find the maximum absolute power value
+                // 2. If it exceeds 1.0, scale all powers down proportionally
+                // 3. This maintains the correct movement direction and ratios
+                double maxPower = Math.max(Math.abs(frontLeftPower), Math.abs(backLeftPower));
+                maxPower = Math.max(maxPower, Math.abs(frontRightPower));
+                maxPower = Math.max(maxPower, Math.abs(backRightPower));
 
-            // Normalize if any power exceeds the driver's max power limit
-            if (maxPower > maxDrivePower) {
-                frontLeftPower = (frontLeftPower / maxPower) * maxDrivePower;
-                backLeftPower = (backLeftPower / maxPower) * maxDrivePower;
-                frontRightPower = (frontRightPower / maxPower) * maxDrivePower;
-                backRightPower = (backRightPower / maxPower) * maxDrivePower;
+                // Normalize if any power exceeds 1.0 (preserves direction and ratios)
+                if (maxPower > 1.0) {
+                    double scale = 1.0 / maxPower;  // Calculate scaling factor
+                    // Scale all powers by the same factor to maintain ratios
+                    frontLeftPower *= scale;
+                    backLeftPower *= scale;
+                    frontRightPower *= scale;
+                    backRightPower *= scale;
+                }
+
+                // Apply driver-specific power limit (multiplier)
+                frontLeftPower *= maxDrivePower;
+                backLeftPower *= maxDrivePower;
+                frontRightPower *= maxDrivePower;
+                backRightPower *= maxDrivePower;
+
+                // Apply range clipping as final safety
+                frontLeftMotor.setPower(Range.clip(frontLeftPower, -1.0, 1.0));
+                backLeftMotor.setPower(Range.clip(backLeftPower, -1.0, 1.0));
+                frontRightMotor.setPower(Range.clip(frontRightPower, -1.0, 1.0));
+                backRightMotor.setPower(Range.clip(backRightPower, -1.0, 1.0));
             }
-
-            // Apply range clipping as final safety
-            frontLeftMotor.setPower(Range.clip(frontLeftPower, -maxDrivePower, maxDrivePower));
-            backLeftMotor.setPower(Range.clip(backLeftPower, -maxDrivePower, maxDrivePower));
-            frontRightMotor.setPower(Range.clip(frontRightPower, -maxDrivePower, maxDrivePower));
-            backRightMotor.setPower(Range.clip(backRightPower, -maxDrivePower, maxDrivePower));
 
             // ========== INTAKE CONTROL (BOTH GAMEPADS) ==========
-            // Toggle intake speed with START button
-            if ((currentGamepad1.start && !previousGamepad1.start) ||
-                    (currentGamepad2.start && !previousGamepad2.start)) {
-                intakeHalfSpeed = !intakeHalfSpeed;
-            }
+            // Disabled in test mode
+            if (!wheelTestMode) {
+                // Toggle intake speed with START button
+                if ((currentGamepad1.start && !previousGamepad1.start) ||
+                        (currentGamepad2.start && !previousGamepad2.start)) {
+                    intakeHalfSpeed = !intakeHalfSpeed;
+                }
 
-            // B button - toggle intake forward
-            if ((currentGamepad1.b && !previousGamepad1.b) ||
-                    (currentGamepad2.b && !previousGamepad2.b)) {
-                intakeForwardActive = !intakeForwardActive;
-                if (intakeForwardActive) intakeReverseActive = false;
-            }
+                // B button - toggle intake forward
+                if ((currentGamepad1.b && !previousGamepad1.b) ||
+                        (currentGamepad2.b && !previousGamepad2.b)) {
+                    intakeForwardActive = !intakeForwardActive;
+                    if (intakeForwardActive) intakeReverseActive = false;
+                }
 
-            // A button - toggle intake reverse
-            if ((currentGamepad1.a && !previousGamepad1.a) ||
-                    (currentGamepad2.a && !previousGamepad2.a)) {
-                intakeReverseActive = !intakeReverseActive;
-                if (intakeReverseActive) intakeForwardActive = false;
+                // A button - toggle intake reverse
+                if ((currentGamepad1.a && !previousGamepad1.a) ||
+                        (currentGamepad2.a && !previousGamepad2.a)) {
+                    intakeReverseActive = !intakeReverseActive;
+                    if (intakeReverseActive) intakeForwardActive = false;
+                }
             }
 
             double intakePower = 0;
@@ -383,11 +513,14 @@ public class testtelop01 extends LinearOpMode {
             intakeMotor.setPower(Range.clip(intakePower, -1.0, 1.0));
 
             // ========== LAUNCH MOTOR CONTROL (BOTH GAMEPADS) ==========
-            if ((currentGamepad1.x && !previousGamepad1.x) ||
-                    (currentGamepad2.x && !previousGamepad2.x)) {
-                launchMotorActive = !launchMotorActive;
-                sleep(500);
-                rampMotor.setPower(-RAMP_MOTOR_POWER);
+            // Disabled in test mode
+            if (!wheelTestMode) {
+                if ((currentGamepad1.x && !previousGamepad1.x) ||
+                        (currentGamepad2.x && !previousGamepad2.x)) {
+                    launchMotorActive = !launchMotorActive;
+                    sleep(500);
+                    rampMotor.setPower(-RAMP_MOTOR_POWER);
+                }
             }
 
             double launchPower = 0;
@@ -401,24 +534,37 @@ public class testtelop01 extends LinearOpMode {
             launchMotor.setPower(Range.clip(launchPower, -1.0, 1.0));
 
             // ========== ENHANCED TELEMETRY ==========
-            telemetry.addLine("========== MATCH MODE ==========");
-            telemetry.addLine();
-            telemetry.addData("Alliance", selectedAlliance);
+            if (wheelTestMode) {
+                telemetry.addLine("========== WHEEL TEST MODE ==========");
+                telemetry.addLine();
+                telemetry.addData(">>> TEST MODE", "ACTIVE <<<");
+                telemetry.addLine("Left Stick Y: Front Left");
+                telemetry.addLine("Left Stick X: Front Right");
+                telemetry.addLine("Right Stick Y: Back Left");
+                telemetry.addLine("Right Stick X: Back Right");
+                telemetry.addLine();
+                telemetry.addLine("Press BOTH BUMPERS to exit");
+                telemetry.addLine();
+            } else {
+                telemetry.addLine("========== MATCH MODE ==========");
+                telemetry.addLine();
+                telemetry.addData("Alliance", selectedAlliance);
 //            telemetry.addData("Heading", "%.0f°", Math.toDegrees(botHeading));
-            telemetry.addData("Active Driver", activeDriver);
-            telemetry.addLine();
-            telemetry.addData("Drive Mode", autoStatus);
-            if (autoAligning) {
-                telemetry.addData(">>> AUTO-ALIGN", "ACTIVE <<<");
+                telemetry.addData("Active Driver", activeDriver);
+                telemetry.addLine();
+                telemetry.addData("Drive Mode", autoStatus);
+                if (autoAligning) {
+                    telemetry.addData(">>> AUTO-ALIGN", "ACTIVE <<<");
+                }
+                telemetry.addLine();
+                telemetry.addData("Intake", intakeStatus);
+                telemetry.addData("Launch", launchStatus);
+                telemetry.addLine();
+                if (slowMode) {
+                    telemetry.addData("Slow Mode", "ACTIVE (30%)");
+                }
+                telemetry.addLine();
             }
-            telemetry.addLine();
-            telemetry.addData("Intake", intakeStatus);
-            telemetry.addData("Launch", launchStatus);
-            telemetry.addLine();
-            if (slowMode) {
-                telemetry.addData("Slow Mode", "ACTIVE (30%)");
-            }
-            telemetry.addLine();
             telemetry.addData("FL Power", "%.2f", frontLeftPower);
             telemetry.addData("BL Power", "%.2f", backLeftPower);
             telemetry.addData("FR Power", "%.2f", frontRightPower);
