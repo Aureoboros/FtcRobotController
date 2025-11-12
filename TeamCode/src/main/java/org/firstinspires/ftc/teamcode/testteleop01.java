@@ -24,6 +24,9 @@ public class testtelop01 extends LinearOpMode {
     private static final double SLOW_MODE_MULTIPLIER = 0.3;
     private static final double JOYSTICK_DEADZONE = 0.1;
     private static final double AUTO_ALIGN_ROTATION_SPEED = 0.15;  // Reduced for tighter turns
+    private static final double ROTATION_SPEED = 0.5;
+    private static final boolean GAMEPAD1_ACTIVE = true;
+    private static final boolean GAMEPAD2_ACTIVE = true;
 
     // Driver-specific power limits
     private static final double GAMEPAD1_MAX_POWER = 1.0;
@@ -130,12 +133,10 @@ public class testtelop01 extends LinearOpMode {
         boolean intakeForwardActive = false;
         boolean intakeReverseActive = false;
         boolean launchMotorActive = false;
+        boolean rampMotorActive = false;
 
         waitForStart();
         if (isStopRequested()) return;
-
-        // Start ramp motor immediately
-        rampMotor.setPower(RAMP_MOTOR_POWER);
 
         while (opModeIsActive()) {
             // Store previous gamepad states
@@ -154,10 +155,9 @@ public class testtelop01 extends LinearOpMode {
             }
 
             // ========== LEFT TRIGGER - APRILTAG AUTO-ALIGNMENT (BOTH GAMEPADS) ==========
-            if ((currentGamepad1.left_trigger > 0.5 && previousGamepad1.left_trigger <= 0.5) ||
-                    (currentGamepad2.left_trigger > 0.5 && previousGamepad2.left_trigger <= 0.5)) {
+            if (currentGamepad1.left_trigger > 0.5 || currentGamepad2.left_trigger > 0.5) {
                 if (selectedAlliance != Alliance.NONE) {
-                    autoAligning = !autoAligning;
+                    autoAligning = true;
                 } else {
                     autoAligning = false;
                 }
@@ -181,17 +181,17 @@ public class testtelop01 extends LinearOpMode {
             String activeDriver = "NONE";
 
             // ========== DRIVER PRIORITY: GAMEPAD1 > GAMEPAD2 ==========
-            boolean gamepad1Active = Math.abs(currentGamepad1.left_stick_x) > JOYSTICK_DEADZONE ||
-                    Math.abs(currentGamepad1.left_stick_y) > JOYSTICK_DEADZONE ||
-                    Math.abs(currentGamepad1.right_stick_x) > JOYSTICK_DEADZONE ||
-                    currentGamepad1.dpad_up || currentGamepad1.dpad_down ||
-                    currentGamepad1.dpad_left || currentGamepad1.dpad_right;
+//            boolean gamepad1Active = Math.abs(currentGamepad1.left_stick_x) > JOYSTICK_DEADZONE ||
+//                    Math.abs(currentGamepad1.left_stick_y) > JOYSTICK_DEADZONE ||
+//                    Math.abs(currentGamepad1.right_stick_x) > JOYSTICK_DEADZONE ||
+//                    currentGamepad1.dpad_up || currentGamepad1.dpad_down ||
+//                    currentGamepad1.dpad_left || currentGamepad1.dpad_right;
 
-            boolean gamepad2Active = Math.abs(currentGamepad2.left_stick_x) > JOYSTICK_DEADZONE ||
-                    Math.abs(currentGamepad2.left_stick_y) > JOYSTICK_DEADZONE ||
-                    Math.abs(currentGamepad2.right_stick_x) > JOYSTICK_DEADZONE ||
-                    currentGamepad2.dpad_up || currentGamepad2.dpad_down ||
-                    currentGamepad2.dpad_left || currentGamepad2.dpad_right;
+//            boolean gamepad2Active = Math.abs(currentGamepad2.left_stick_x) > JOYSTICK_DEADZONE ||
+//                    Math.abs(currentGamepad2.left_stick_y) > JOYSTICK_DEADZONE ||
+//                    Math.abs(currentGamepad2.right_stick_x) > JOYSTICK_DEADZONE ||
+//                    currentGamepad2.dpad_up || currentGamepad2.dpad_down ||
+//                    currentGamepad2.dpad_left || currentGamepad2.dpad_right;
 
             if (autoAligning) {
                 // ========== APRILTAG AUTO-ALIGNMENT ==========
@@ -213,22 +213,38 @@ public class testtelop01 extends LinearOpMode {
                     }
                 } else {
                     if (selectedAlliance == Alliance.RED) {
-                        rx = AUTO_ALIGN_ROTATION_SPEED;
+                        rx = AUTO_ALIGN_ROTATION_SPEED * SLOW_MODE_MULTIPLIER;
                     } else {
-                        rx = -AUTO_ALIGN_ROTATION_SPEED;
+                        rx = -AUTO_ALIGN_ROTATION_SPEED * SLOW_MODE_MULTIPLIER;
                     }
                     autoStatus = "SEARCHING FOR TAG...";
                 }
 
                 // Allow manual translation during auto-alignment
-                if (gamepad1Active) {
+                if (GAMEPAD1_ACTIVE) {
                     y = -currentGamepad1.left_stick_y;
+                    frontLeftMotor.setPower(y);
+                    frontRightMotor.setPower(y);
+                    backLeftMotor.setPower(y);
+                    backRightMotor.setPower(y);
                     x = currentGamepad1.left_stick_x;
+                    frontLeftMotor.setPower(x);
+                    frontRightMotor.setPower(-x);
+                    backLeftMotor.setPower(-x);
+                    backRightMotor.setPower(x);
                     maxDrivePower = GAMEPAD1_MAX_POWER;
                     activeDriver = "DRIVER 1";
-                } else if (gamepad2Active) {
+                } else if (GAMEPAD2_ACTIVE) {
                     y = -currentGamepad2.left_stick_y;
+                    frontLeftMotor.setPower(y);
+                    frontRightMotor.setPower(y);
+                    backLeftMotor.setPower(y);
+                    backRightMotor.setPower(y);
                     x = currentGamepad2.left_stick_x;
+                    frontLeftMotor.setPower(x);
+                    frontRightMotor.setPower(-x);
+                    backLeftMotor.setPower(-x);
+                    backRightMotor.setPower(x);
                     maxDrivePower = GAMEPAD2_MAX_POWER;
                     activeDriver = "DRIVER 2";
                 }
@@ -237,42 +253,32 @@ public class testtelop01 extends LinearOpMode {
                 x = applyDeadzone(x);
             } else {
                 // ========== MANUAL CONTROL ==========
-                if (gamepad1Active) {
+                if (GAMEPAD1_ACTIVE) {
                     y = -currentGamepad1.left_stick_y;
+                    frontLeftMotor.setPower(y);
+                    frontRightMotor.setPower(y);
+                    backLeftMotor.setPower(y);
+                    backRightMotor.setPower(y);
                     x = currentGamepad1.left_stick_x;
-                    rx = currentGamepad1.right_stick_x;
+                    frontLeftMotor.setPower(x);
+                    frontRightMotor.setPower(-x);
+                    backLeftMotor.setPower(-x);
+                    backRightMotor.setPower(x);
                     maxDrivePower = GAMEPAD1_MAX_POWER;
                     activeDriver = "DRIVER 1";
-
-                    // D-pad control for gamepad1
-                    if (currentGamepad1.dpad_up) {
-                        y = DPAD_POWER;
-                    } else if (currentGamepad1.dpad_down) {
-                        y = -DPAD_POWER;
-                    }
-                    if (currentGamepad1.dpad_right) {
-                        x = DPAD_POWER;
-                    } else if (currentGamepad1.dpad_left) {
-                        x = -DPAD_POWER;
-                    }
-                } else if (gamepad2Active) {
+                } else if (GAMEPAD2_ACTIVE) {
                     y = -currentGamepad2.left_stick_y;
+                    frontLeftMotor.setPower(y);
+                    frontRightMotor.setPower(y);
+                    backLeftMotor.setPower(y);
+                    backRightMotor.setPower(y);
                     x = currentGamepad2.left_stick_x;
-                    rx = currentGamepad2.right_stick_x;
+                    frontLeftMotor.setPower(x);
+                    frontRightMotor.setPower(-x);
+                    backLeftMotor.setPower(-x);
+                    backRightMotor.setPower(x);
                     maxDrivePower = GAMEPAD2_MAX_POWER;
                     activeDriver = "DRIVER 2";
-
-                    // D-pad control for gamepad2
-                    if (currentGamepad2.dpad_up) {
-                        y = DPAD_POWER;
-                    } else if (currentGamepad2.dpad_down) {
-                        y = -DPAD_POWER;
-                    }
-                    if (currentGamepad2.dpad_right) {
-                        x = DPAD_POWER;
-                    } else if (currentGamepad2.dpad_left) {
-                        x = -DPAD_POWER;
-                    }
                 }
 
                 // Apply deadzone
@@ -310,17 +316,17 @@ public class testtelop01 extends LinearOpMode {
             }
 
             // ========== FIELD-CENTRIC TRANSFORMATION ==========
-            double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-            double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
-            double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
-            rotX = rotX * 1.1;  // Strafe correction
+//            double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+//            double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
+//            double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
+//            rotX = rotX * 1.1;  // Strafe correction
 
             // ========== POWER NORMALIZATION (CRITICAL FIX) ==========
-            // Inverted rx to fix rotation direction (right should turn right, left should turn left)
-            double frontLeftPower = rotY + rotX - rx;
-            double backLeftPower = rotY - rotX - rx;
-            double frontRightPower = rotY - rotX + rx;
-            double backRightPower = rotY + rotX + rx;
+            // Changed back to rx
+            double frontLeftPower = rx;
+            double backLeftPower = rx;
+            double frontRightPower = -rx;
+            double backRightPower = -rx;
 
             // Find the maximum absolute power
             double maxPower = Math.abs(frontLeftPower);
@@ -380,12 +386,16 @@ public class testtelop01 extends LinearOpMode {
             if ((currentGamepad1.x && !previousGamepad1.x) ||
                     (currentGamepad2.x && !previousGamepad2.x)) {
                 launchMotorActive = !launchMotorActive;
+                sleep(500);
+                rampMotor.setPower(-RAMP_MOTOR_POWER);
             }
 
             double launchPower = 0;
+            double rampPower = 0;
             String launchStatus = "STOPPED";
             if (launchMotorActive) {
                 launchPower = -LAUNCH_MOTOR_POWER;
+                rampPower = RAMP_MOTOR_POWER;
                 launchStatus = "RUNNING";
             }
             launchMotor.setPower(Range.clip(launchPower, -1.0, 1.0));
@@ -394,7 +404,7 @@ public class testtelop01 extends LinearOpMode {
             telemetry.addLine("========== MATCH MODE ==========");
             telemetry.addLine();
             telemetry.addData("Alliance", selectedAlliance);
-            telemetry.addData("Heading", "%.0f°", Math.toDegrees(botHeading));
+//            telemetry.addData("Heading", "%.0f°", Math.toDegrees(botHeading));
             telemetry.addData("Active Driver", activeDriver);
             telemetry.addLine();
             telemetry.addData("Drive Mode", autoStatus);
