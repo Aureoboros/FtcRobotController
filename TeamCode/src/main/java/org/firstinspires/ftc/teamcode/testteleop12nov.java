@@ -94,10 +94,10 @@ public class testteleop12nov extends LinearOpMode {
         rampMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // Initial motor powers to zero
-        frontLeftMotor.setPower(0);
-        frontRightMotor.setPower(0);
-        backLeftMotor.setPower(0);
-        backRightMotor.setPower(0);
+        //frontLeftMotor.setPower(0);
+        //frontRightMotor.setPower(0);
+        //backLeftMotor.setPower(0);
+        //backRightMotor.setPower(0);
 
         // Initialize IMU with proper orientation (Control Hub sideways, logo facing left)
         IMU imu = hardwareMap.get(IMU.class, "imu");
@@ -405,7 +405,7 @@ public class testteleop12nov extends LinearOpMode {
                 sleep(500);
 
                 intakeMotor.setPower(Range.clip(intakePower, -1.0, 1.0));
-                rampMotor.setPower(-RAMP_MOTOR_POWER * 0.4);
+                //rampMotor.setPower(-RAMP_MOTOR_POWER * 0.4);
             }
 //Goto position before shoot
             if ((currentGamepad1.x && !previousGamepad1.x) ||
