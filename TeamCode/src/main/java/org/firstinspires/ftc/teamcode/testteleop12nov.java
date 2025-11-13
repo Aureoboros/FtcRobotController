@@ -153,6 +153,7 @@ public class testteleop12nov extends LinearOpMode {
             previousGamepad2.copy(currentGamepad2);
             currentGamepad2.copy(gamepad2);
 
+
             // ========== ALLIANCE SELECTION (BOTH GAMEPADS) ==========
             if ((currentGamepad1.left_bumper && !previousGamepad1.left_bumper) ||
                     (currentGamepad2.left_bumper && !previousGamepad2.left_bumper)) {
@@ -262,12 +263,12 @@ public class testteleop12nov extends LinearOpMode {
             } else {
                 // ========== MANUAL CONTROL ==========
                 if (GAMEPAD1_ACTIVE) {
-                    y = -currentGamepad1.left_stick_y;
+                    y = -currentGamepad1.left_stick_x;
                     frontLeftMotor.setPower(y);
                     frontRightMotor.setPower(y);
                     backLeftMotor.setPower(y);
                     backRightMotor.setPower(y);
-                    x = currentGamepad1.left_stick_x;
+                    x = currentGamepad1.left_stick_y;
                     frontLeftMotor.setPower(x);
                     frontRightMotor.setPower(-x);
                     backLeftMotor.setPower(-x);
@@ -275,12 +276,12 @@ public class testteleop12nov extends LinearOpMode {
                     maxDrivePower = GAMEPAD1_MAX_POWER;
                     activeDriver = "DRIVER 1";
                 } else if (GAMEPAD2_ACTIVE) {
-                    y = -currentGamepad2.left_stick_y;
+                    y = -currentGamepad2.left_stick_x;
                     frontLeftMotor.setPower(y);
                     frontRightMotor.setPower(y);
                     backLeftMotor.setPower(y);
                     backRightMotor.setPower(y);
-                    x = currentGamepad2.left_stick_x;
+                    x = currentGamepad2.left_stick_y;
                     frontLeftMotor.setPower(x);
                     frontRightMotor.setPower(-x);
                     backLeftMotor.setPower(-x);
@@ -340,7 +341,7 @@ public class testteleop12nov extends LinearOpMode {
             double backRightPower = -rx;
 
             // Find the maximum absolute power
-            double maxPower = Math.abs(frontLeftPower);
+            double maxPower = 1.0; //Math.abs(frontLeftPower);
             maxPower = Math.max(maxPower, Math.abs(backLeftPower));
             maxPower = Math.max(maxPower, Math.abs(frontRightPower));
             maxPower = Math.max(maxPower, Math.abs(backRightPower));
@@ -404,8 +405,9 @@ public class testteleop12nov extends LinearOpMode {
                 launchStatus = "STOPPED";
                 sleep(500);
 
-                intakeMotor.setPower(Range.clip(intakePower, -1.0, 1.0));
+                //intakeMotor.setPower(Range.clip(intakePower, -1.0, 1.0));
                 //rampMotor.setPower(-RAMP_MOTOR_POWER * 0.4);
+                intakeMotor.setPower(1.0);
             }
 //Goto position before shoot
             if ((currentGamepad1.x && !previousGamepad1.x) ||
@@ -418,7 +420,8 @@ public class testteleop12nov extends LinearOpMode {
                 launchStatus = "RUNNING";
                 sleep(3000);
 
-                intakeMotor.setPower(Range.clip(intakePower, -1.0, 1.0));
+                //intakeMotor.setPower(Range.clip(intakePower, -1.0, 1.0));
+                intakeMotor.setPower(1.0);
                 rampMotor.setPower(-RAMP_MOTOR_POWER * 0.4);
             }
 
@@ -455,6 +458,8 @@ public class testteleop12nov extends LinearOpMode {
             telemetry.addData("BL Power", "%.2f", backLeftPower);
             telemetry.addData("FR Power", "%.2f", frontRightPower);
             telemetry.addData("BR Power", "%.2f", backRightPower);
+            telemetry.addData("max Power", "%.2f", maxPower);
+            telemetry.addData("max drive Power", "%.2f", maxDrivePower);
             telemetry.addData("FL Encoder", frontLeftMotor.getCurrentPosition());
             telemetry.addData("BR Encoder", backRightMotor.getCurrentPosition());
             telemetry.update();
