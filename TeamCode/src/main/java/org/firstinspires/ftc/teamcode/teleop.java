@@ -88,14 +88,14 @@ public class teleop extends LinearOpMode {
         DcMotor rampMotor = hardwareMap.dcMotor.get("rampMotor");
         
         // Dead wheel encoders
-        DcMotor forwardOdo = hardwareMap.dcMotor.get("forwardOdo");
-        DcMotor rightOdo = hardwareMap.dcMotor.get("rightOdo");
+        //DcMotor forwardOdo = hardwareMap.dcMotor.get("forwardOdo");
+        //DcMotor rightOdo = hardwareMap.dcMotor.get("rightOdo");
         
         // Reset encoders
-        forwardOdo.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        rightOdo.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        forwardOdo.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        rightOdo.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        //forwardOdo.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        //rightOdo.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        //forwardOdo.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        //rightOdo.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         
         // Motor modes
         intakeMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
@@ -158,15 +158,29 @@ public class teleop extends LinearOpMode {
         if (isStopRequested()) return;
         
         // Start ramp motor immediately
-        rampMotor.setPower(RAMP_MOTOR_POWER);
-        
+
+        //This works for 2 balls consistently
+//        launchMotor.setPower(RAMP_MOTOR_POWER * 0.7);
+//        sleep(3000);
+//        rampMotor.setPower(-RAMP_MOTOR_POWER * 0.4);
+//        intakeMotor.setPower(RAMP_MOTOR_POWER);
+//        while(true);
+
+
+        launchMotor.setPower(RAMP_MOTOR_POWER * 0.7);
+        sleep(3000);
+        rampMotor.setPower(-RAMP_MOTOR_POWER * 0.4);
+        intakeMotor.setPower(RAMP_MOTOR_POWER);
+        while(true);
+
+/*
         while (opModeIsActive()) {
             // Store previous gamepad state
             previousGamepad1.copy(currentGamepad1);
             currentGamepad1.copy(gamepad1);
             
             // Update odometry
-            updateOdometry(forwardOdo, rightOdo, imu);
+            //updateOdometry(forwardOdo, rightOdo, imu);
             
             // ========== ALLIANCE SELECTION ==========
             if (currentGamepad1.left_bumper && !previousGamepad1.left_bumper) {
@@ -371,6 +385,7 @@ public class teleop extends LinearOpMode {
         
         // Clean up vision
         visionPortal.close();
+ */
     }
     
     private void updateOdometry(DcMotor forwardOdo, DcMotor rightOdo, IMU imu) {
