@@ -275,16 +275,17 @@ public class testteleop12nov extends LinearOpMode {
                     backRightMotor.setPower(x);
                     maxDrivePower = GAMEPAD1_MAX_POWER;
                     activeDriver = "DRIVER 1";
-                } else if (GAMEPAD2_ACTIVE) {
+                }
+                if (GAMEPAD2_ACTIVE) {
                     y = -currentGamepad2.left_stick_x;
                     frontLeftMotor.setPower(y);
-                    frontRightMotor.setPower(y);
+                    frontRightMotor.setPower(-y);
                     backLeftMotor.setPower(y);
-                    backRightMotor.setPower(y);
-                    x = currentGamepad2.left_stick_y;
-                    frontLeftMotor.setPower(x);
+                    backRightMotor.setPower(-y);
+                    x = -currentGamepad2.left_stick_y;
+                    frontLeftMotor.setPower(-x);
                     frontRightMotor.setPower(-x);
-                    backLeftMotor.setPower(-x);
+                    backLeftMotor.setPower(x);
                     backRightMotor.setPower(x);
                     maxDrivePower = GAMEPAD2_MAX_POWER;
                     activeDriver = "DRIVER 2";
