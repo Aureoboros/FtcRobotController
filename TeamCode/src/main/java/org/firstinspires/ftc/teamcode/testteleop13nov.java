@@ -339,7 +339,7 @@ public class testteleop13nov extends LinearOpMode {
                 }
 
                 // Rotate only
-                if (gamepad1RotateActive) {
+                else if (gamepad1RotateActive) {
                     maxDrivePower = GAMEPAD1_MAX_POWER;
                     activeDriver = "DRIVER 1";
                     // Rotate on right stick
