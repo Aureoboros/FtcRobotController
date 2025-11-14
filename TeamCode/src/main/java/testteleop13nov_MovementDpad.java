@@ -1,5 +1,3 @@
-package org.firstinspires.ftc.teamcode;
-
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -17,7 +15,7 @@ import java.util.List;
 // yummy yummy cheesecake for our scrumptious souls. i will sell my organs for cheesecake. i am sorry, i was possessed by the demons.
 
 @TeleOp
-public class testteleop13nov extends LinearOpMode {
+public class testteleop13nov_MovementDpad extends LinearOpMode {
     // ========== MOTOR POWER CONSTANTS ==========
     private static final double INTAKE_FULL_POWER = 1.0;
     private static final double INTAKE_HALF_POWER = 0.5;
@@ -190,8 +188,10 @@ public class testteleop13nov extends LinearOpMode {
             String activeDriver = "NONE";
 
              //========== DRIVER PRIORITY: GAMEPAD1 > GAMEPAD2 ==========
-            boolean gamepad1MoveActive = Math.abs(currentGamepad1.left_stick_x) > JOYSTICK_DEADZONE ||
-                    Math.abs(currentGamepad1.left_stick_y) > JOYSTICK_DEADZONE;
+            boolean gamepad1MoveActive = currentGamepad1.dpad_up || currentGamepad1.dpad_down ||
+                    currentGamepad1.dpad_left || currentGamepad1.dpad_right ||
+                    Math.abs(currentGamepad1.right_stick_x) > JOYSTICK_DEADZONE;;
+
 
             boolean gamepad1RotateActive =Math.abs(currentGamepad1.right_stick_x) > JOYSTICK_DEADZONE ||
                     Math.abs(currentGamepad1.right_stick_y) > JOYSTICK_DEADZONE;
@@ -230,7 +230,7 @@ public class testteleop13nov extends LinearOpMode {
                 }
 
                 // Allow manual translation during auto-alignment
-                if (gamepad1MoveActive) {
+                if (GAMEPAD1_ACTIVE) {
                     y = -currentGamepad1.left_stick_x;
                     frontLeftMotor.setPower(y);
                     frontRightMotor.setPower(y);
@@ -263,91 +263,25 @@ public class testteleop13nov extends LinearOpMode {
                 x = applyDeadzone(x);
             } else {
                 // ========== MANUAL CONTROL ==========
-                y = x = rx = 0;
-                // Movement only
+                y = x = 0;
                 if (gamepad1MoveActive) {
-                    y = -currentGamepad1.left_stick_x;
-                    frontLeftMotor.setPower(y);
-                    frontRightMotor.setPower(y);
-                    backLeftMotor.setPower(y);
-                    backRightMotor.setPower(y);
-                    x = currentGamepad1.left_stick_y;
-                    frontLeftMotor.setPower(x);
-                    frontRightMotor.setPower(-x);
-                    backLeftMotor.setPower(-x);
-                    backRightMotor.setPower(x);
-                    maxDrivePower = GAMEPAD1_MAX_POWER;
-                    activeDriver = "DRIVER 1";
-
-
-                    // Apply deadzone
-                    y = applyDeadzone(y);
-                    x = applyDeadzone(x);
-                    rx = applyDeadzone(rx);
-
-                    // Disabling slow mode
-                    // Toggle slow mode with Y button (either gamepad)
-                    //if ((currentGamepad1.y && !previousGamepad1.y) ||
-                    //        (currentGamepad2.y && !previousGamepad2.y)) {
-                    //    slowMode = !slowMode;
-                    //}
-
-                    // Apply slow mode
-                    // Please remember that this will only apply later, not on init, so if you want it
-                    // applied on init, please put the multiplier before setpower calls
-                    if (slowMode) {
-                        y *= SLOW_MODE_MULTIPLIER;
-                        x *= SLOW_MODE_MULTIPLIER;
-                        rx *= SLOW_MODE_MULTIPLIER;
+                    if (currentGamepad1.dpad_up) {
+                        x = -DPAD_POWER;
+                    } else if (currentGamepad1.dpad_down) {
+                        x = DPAD_POWER;
+                    } else {
+                        x = 0;
                     }
 
-                    // ========== POWER NORMALIZATION (CRITICAL FIX) ==========
-                    // Changed back to rx
-                    //double frontLeftPower = rx;
-                    //double backLeftPower = rx;
-                    //double frontRightPower = -rx;
-                    //double backRightPower = -rx;
-
-                    double frontLeftPower = y + x + rx;
-                    double backLeftPower = y - x + rx;
-                    double frontRightPower = y - x - rx;
-                    double backRightPower = y + x - rx;
-
-                    // Find the maximum absolute power
-                    double maxPower = Math.abs(frontLeftPower);
-                    maxPower = Math.max(maxPower, Math.abs(backLeftPower));
-                    maxPower = Math.max(maxPower, Math.abs(frontRightPower));
-                    maxPower = Math.max(maxPower, Math.abs(backRightPower));
-
-                    // Normalize if any power exceeds the driver's max power limit
-                    if (maxPower > maxDrivePower) {
-                        frontLeftPower = (frontLeftPower / maxPower) * maxDrivePower;
-                        backLeftPower = (backLeftPower / maxPower) * maxDrivePower;
-                        frontRightPower = (frontRightPower / maxPower) * maxDrivePower;
-                        backRightPower = (backRightPower / maxPower) * maxDrivePower;
+                    if (currentGamepad1.dpad_left) {
+                        y = DPAD_POWER;
+                    } else if (currentGamepad1.dpad_right) {
+                        y = -DPAD_POWER;
+                    } else {
+                        y = 0;
                     }
-
-                    // Apply range clipping as final safety
-                    frontLeftMotor.setPower(Range.clip(frontLeftPower, -maxDrivePower, maxDrivePower));
-                    backLeftMotor.setPower(Range.clip(backLeftPower, -maxDrivePower, maxDrivePower));
-                    frontRightMotor.setPower(Range.clip(frontRightPower, -maxDrivePower, maxDrivePower));
-                    backRightMotor.setPower(Range.clip(backRightPower, -maxDrivePower, maxDrivePower));
-
-                    telemetry.addData("FL Power", "%.2f", frontLeftPower);
-                    telemetry.addData("BL Power", "%.2f", backLeftPower);
-                    telemetry.addData("FR Power", "%.2f", frontRightPower);
-                    telemetry.addData("BR Power", "%.2f", backRightPower);
-                    telemetry.addData("max Power", "%.2f", maxPower);
-                    telemetry.addData("max drive Power", "%.2f", maxDrivePower);
-                    telemetry.addData("FL Encoder", frontLeftMotor.getCurrentPosition());
-                    telemetry.addData("BR Encoder", backRightMotor.getCurrentPosition());
-
                 }
-
-                // Rotate only
                 else if (gamepad1RotateActive) {
-                    maxDrivePower = GAMEPAD1_MAX_POWER;
-                    activeDriver = "DRIVER 1";
                     // Rotate on right stick
                     y = -currentGamepad1.right_stick_x;
                     frontLeftMotor.setPower(y);
@@ -359,59 +293,30 @@ public class testteleop13nov extends LinearOpMode {
                     frontRightMotor.setPower(-x);
                     backLeftMotor.setPower(x);
                     backRightMotor.setPower(x);
+                }
+                rx = currentGamepad1.right_stick_x;
+                    maxDrivePower = GAMEPAD1_MAX_POWER;
+                    activeDriver = "DRIVER 1";
 
-                    // Apply slow mode
-                    // Please remember that this will only apply later, not on init, so if you want it
-                    // applied on init, please put the multiplier before setpower calls
-                    if (slowMode) {
-                        y *= SLOW_MODE_MULTIPLIER;
-                        x *= SLOW_MODE_MULTIPLIER;
-                        rx *= SLOW_MODE_MULTIPLIER;
-                    }
+                // Apply deadzone
+                //y = applyDeadzone(y);
+                //x = applyDeadzone(x);
+                rx = applyDeadzone(rx);
 
-                    // ========== POWER NORMALIZATION (CRITICAL FIX) ==========
-                    // Changed back to rx
-                    //double frontLeftPower = rx;
-                    //double backLeftPower = rx;
-                    //double frontRightPower = -rx;
-                    //double backRightPower = -rx;
+                // Disabling slow mode
+                // Toggle slow mode with Y button (either gamepad)
+                //if ((currentGamepad1.y && !previousGamepad1.y) ||
+                //        (currentGamepad2.y && !previousGamepad2.y)) {
+                //    slowMode = !slowMode;
+                //}
 
-                    double frontLeftPower = y + x + rx;
-                    double backLeftPower = y - x + rx;
-                    double frontRightPower = y - x - rx;
-                    double backRightPower = y + x - rx;
-
-
-                    // Find the maximum absolute power
-                    double maxPower = Math.abs(frontLeftPower);
-                    maxPower = Math.max(maxPower, Math.abs(backLeftPower));
-                    maxPower = Math.max(maxPower, Math.abs(frontRightPower));
-                    maxPower = Math.max(maxPower, Math.abs(backRightPower));
-
-                    // Normalize if any power exceeds the driver's max power limit
-                    if (maxPower > maxDrivePower) {
-                        frontLeftPower = (frontLeftPower / maxPower) * maxDrivePower;
-                        backLeftPower = (backLeftPower / maxPower) * maxDrivePower;
-                        frontRightPower = (frontRightPower / maxPower) * maxDrivePower;
-                        backRightPower = (backRightPower / maxPower) * maxDrivePower;
-                    }
-
-                    // Apply range clipping as final safety
-                    frontLeftMotor.setPower(Range.clip(frontLeftPower, -maxDrivePower, maxDrivePower));
-                    backLeftMotor.setPower(Range.clip(backLeftPower, -maxDrivePower, maxDrivePower));
-                    frontRightMotor.setPower(Range.clip(frontRightPower, -maxDrivePower, maxDrivePower));
-                    backRightMotor.setPower(Range.clip(backRightPower, -maxDrivePower, maxDrivePower));
-
-                    telemetry.addData("FL Power", "%.2f", frontLeftPower);
-                    telemetry.addData("BL Power", "%.2f", backLeftPower);
-                    telemetry.addData("FR Power", "%.2f", frontRightPower);
-                    telemetry.addData("BR Power", "%.2f", backRightPower);
-                    telemetry.addData("max Power", "%.2f", maxPower);
-                    telemetry.addData("max drive Power", "%.2f", maxDrivePower);
-                    telemetry.addData("FL Encoder", frontLeftMotor.getCurrentPosition());
-                    telemetry.addData("BR Encoder", backRightMotor.getCurrentPosition());
-
-
+                // Apply slow mode
+                // Please remember that this will only apply later, not on init, so if you want it
+                // applied on init, please put the multiplier before setpower calls
+                if (slowMode) {
+                    y *= SLOW_MODE_MULTIPLIER;
+                    x *= SLOW_MODE_MULTIPLIER;
+                    rx *= SLOW_MODE_MULTIPLIER;
                 }
             }
 
@@ -435,6 +340,39 @@ public class testteleop13nov extends LinearOpMode {
 //            double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
 //            double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
 //            rotX = rotX * 1.1;  // Strafe correction
+
+            // ========== POWER NORMALIZATION (CRITICAL FIX) ==========
+            // Changed back to rx
+            //double frontLeftPower = rx;
+            //double backLeftPower = rx;
+            //double frontRightPower = -rx;
+            //double backRightPower = -rx;
+
+            double frontLeftPower = y + x + rx;
+            double backLeftPower = y - x + rx;
+            double frontRightPower = y - x - rx;
+            double backRightPower = y + x - rx;
+
+
+            // Find the maximum absolute power
+            double maxPower = Math.abs(frontLeftPower);
+            maxPower = Math.max(maxPower, Math.abs(backLeftPower));
+            maxPower = Math.max(maxPower, Math.abs(frontRightPower));
+            maxPower = Math.max(maxPower, Math.abs(backRightPower));
+
+            // Normalize if any power exceeds the driver's max power limit
+            if (maxPower > maxDrivePower) {
+                frontLeftPower = (frontLeftPower / maxPower) * maxDrivePower;
+                backLeftPower = (backLeftPower / maxPower) * maxDrivePower;
+                frontRightPower = (frontRightPower / maxPower) * maxDrivePower;
+                backRightPower = (backRightPower / maxPower) * maxDrivePower;
+            }
+
+            // Apply range clipping as final safety
+            frontLeftMotor.setPower(Range.clip(frontLeftPower, -maxDrivePower, maxDrivePower));
+            backLeftMotor.setPower(Range.clip(backLeftPower, -maxDrivePower, maxDrivePower));
+            frontRightMotor.setPower(Range.clip(frontRightPower, -maxDrivePower, maxDrivePower));
+            backRightMotor.setPower(Range.clip(backRightPower, -maxDrivePower, maxDrivePower));
 
             // ========== INTAKE CONTROL (BOTH GAMEPADS) ==========
             // Toggle intake speed with START button
@@ -550,11 +488,11 @@ public class testteleop13nov extends LinearOpMode {
                 telemetry.addData("Slow Mode", "ACTIVE (30%)");
             }
             telemetry.addLine();
-          //  telemetry.addData("FL Power", "%.2f", frontLeftPower);
-          //  telemetry.addData("BL Power", "%.2f", backLeftPower);
-          //  telemetry.addData("FR Power", "%.2f", frontRightPower);
-          //  telemetry.addData("BR Power", "%.2f", backRightPower);
-          //  telemetry.addData("max Power", "%.2f", maxPower);
+            telemetry.addData("FL Power", "%.2f", frontLeftPower);
+            telemetry.addData("BL Power", "%.2f", backLeftPower);
+            telemetry.addData("FR Power", "%.2f", frontRightPower);
+            telemetry.addData("BR Power", "%.2f", backRightPower);
+            telemetry.addData("max Power", "%.2f", maxPower);
             telemetry.addData("max drive Power", "%.2f", maxDrivePower);
             telemetry.addData("FL Encoder", frontLeftMotor.getCurrentPosition());
             telemetry.addData("BR Encoder", backRightMotor.getCurrentPosition());
