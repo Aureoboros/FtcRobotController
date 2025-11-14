@@ -14,7 +14,7 @@ import java.util.List;
 // yummy yummy cheesecake for our scrumptious souls. i will sell my organs for cheesecake. i am sorry, i was possessed by the demons.
 
 @TeleOp
-public class testteleop01 extends LinearOpMode {
+public class TestTeleOp02 extends LinearOpMode {
     // ========== MOTOR POWER CONSTANTS ==========
     private static final double INTAKE_FULL_POWER = 1.0;
     private static final double INTAKE_HALF_POWER = 0.5;
