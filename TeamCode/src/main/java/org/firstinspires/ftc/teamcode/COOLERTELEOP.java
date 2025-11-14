@@ -430,7 +430,7 @@ public class testteleop13nov extends LinearOpMode {
                 rampMotor.setPower(0);
 
                 launchMotorActive = true;
-                launchMotor.setPower(LAUNCH_MOTOR_POWER * 0.7);
+                launchMotor.setPower(LAUNCH_MOTOR_POWER * 0.75);
                 launchStatus = "RUNNING";
                 sleep(3000);
 
