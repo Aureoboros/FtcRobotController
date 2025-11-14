@@ -191,12 +191,10 @@ public class testteleop13nov extends LinearOpMode {
 
              //========== DRIVER PRIORITY: GAMEPAD1 > GAMEPAD2 ==========
             boolean gamepad1MoveActive = Math.abs(currentGamepad1.left_stick_x) > JOYSTICK_DEADZONE ||
-                    Math.abs(currentGamepad1.left_stick_y) > JOYSTICK_DEADZONE ||
-                    Math.abs(currentGamepad1.right_stick_x) > JOYSTICK_DEADZONE;
+                    Math.abs(currentGamepad1.left_stick_y) > JOYSTICK_DEADZONE;
 
-            boolean gamepad1RotateActive =
-                    currentGamepad1.dpad_up || currentGamepad1.dpad_down ||
-                    currentGamepad1.dpad_left || currentGamepad1.dpad_right;
+            boolean gamepad1RotateActive =Math.abs(currentGamepad1.right_stick_x) > JOYSTICK_DEADZONE ||
+                    Math.abs(currentGamepad1.right_stick_y) > JOYSTICK_DEADZONE;
 
             boolean gamepad2Active = Math.abs(currentGamepad2.left_stick_x) > JOYSTICK_DEADZONE ||
                     Math.abs(currentGamepad2.left_stick_y) > JOYSTICK_DEADZONE ||
@@ -328,6 +326,16 @@ public class testteleop13nov extends LinearOpMode {
                     backLeftMotor.setPower(Range.clip(backLeftPower, -maxDrivePower, maxDrivePower));
                     frontRightMotor.setPower(Range.clip(frontRightPower, -maxDrivePower, maxDrivePower));
                     backRightMotor.setPower(Range.clip(backRightPower, -maxDrivePower, maxDrivePower));
+
+                    telemetry.addData("FL Power", "%.2f", frontLeftPower);
+                    telemetry.addData("BL Power", "%.2f", backLeftPower);
+                    telemetry.addData("FR Power", "%.2f", frontRightPower);
+                    telemetry.addData("BR Power", "%.2f", backRightPower);
+                    telemetry.addData("max Power", "%.2f", maxPower);
+                    telemetry.addData("max drive Power", "%.2f", maxDrivePower);
+                    telemetry.addData("FL Encoder", frontLeftMotor.getCurrentPosition());
+                    telemetry.addData("BR Encoder", backRightMotor.getCurrentPosition());
+
                 }
 
                 // Rotate only
@@ -381,6 +389,16 @@ public class testteleop13nov extends LinearOpMode {
                     backLeftMotor.setPower(Range.clip(backLeftPower, -maxDrivePower, maxDrivePower));
                     frontRightMotor.setPower(Range.clip(frontRightPower, -maxDrivePower, maxDrivePower));
                     backRightMotor.setPower(Range.clip(backRightPower, -maxDrivePower, maxDrivePower));
+
+                    telemetry.addData("FL Power", "%.2f", frontLeftPower);
+                    telemetry.addData("BL Power", "%.2f", backLeftPower);
+                    telemetry.addData("FR Power", "%.2f", frontRightPower);
+                    telemetry.addData("BR Power", "%.2f", backRightPower);
+                    telemetry.addData("max Power", "%.2f", maxPower);
+                    telemetry.addData("max drive Power", "%.2f", maxDrivePower);
+                    telemetry.addData("FL Encoder", frontLeftMotor.getCurrentPosition());
+                    telemetry.addData("BR Encoder", backRightMotor.getCurrentPosition());
+
                 }
             }
 
