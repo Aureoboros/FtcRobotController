@@ -13,10 +13,12 @@ public class EshaTest extends LinearOpMode {
 
     // Motor power constants
     private static final double FORWARD_POWER = 0.5;
+    private static final double STRAFE_POWER = 0.5;
 
     // Timing constants
-    private static final long FORWARD_TIME_MS = 1900;  // 1.9 seconds
-  
+    private static final long FORWARD_TIME_MS = 1800;  // 1.8 seconds
+    private static final long STRAFE_LEFT_TIME_MS = 200;  // 200 milliseconds
+
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -52,7 +54,8 @@ public class EshaTest extends LinearOpMode {
         telemetry.addLine("========================================");
         telemetry.addData("Status", "Initialized");
         telemetry.addLine("Sequence:");
-        telemetry.addLine("1. Move forward for 1.9 seconds");
+        telemetry.addLine("1. Move forward for 1.8 seconds");
+        telemetry.addLine("2. Move left for 200 milliseconds");
         telemetry.addLine("========================================");
         telemetry.addLine("Press START to begin");
         telemetry.addLine("========================================");
@@ -61,10 +64,10 @@ public class EshaTest extends LinearOpMode {
         waitForStart();
         if (isStopRequested()) return;
 
-        // ========== STEP 1: MOVE FORWARD FOR 1.9 SECONDS ==========
+        // ========== STEP 1: MOVE FORWARD FOR 1.8 SECONDS ==========
         telemetry.addLine("========================================");
         telemetry.addData("Status", "Moving forward...");
-        telemetry.addData("Duration", "1.9 seconds");
+        telemetry.addData("Duration", "1.8 seconds");
         telemetry.addLine("========================================");
         telemetry.update();
 
@@ -75,18 +78,36 @@ public class EshaTest extends LinearOpMode {
         frontRightMotor.setPower(-FORWARD_POWER);
         frontLeftMotor.setPower(FORWARD_POWER);
 
-        // Move forward for 1.9 seconds
+        // Move forward for 1.8 seconds
         sleep(FORWARD_TIME_MS);
 
         // Stop all motors
         stopAllMotors(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor);
 
-        // Brief pause before turning
+        // Brief pause before strafing
         sleep(500);
-        
+
+        // ========== STEP 2: STRAFE LEFT FOR 200 MILLISECONDS ==========
+        telemetry.addLine("========================================");
+        telemetry.addData("Status", "Strafing left...");
+        telemetry.addData("Duration", "200 milliseconds");
+        telemetry.addLine("========================================");
+        telemetry.update();
 
         // Record starting angle for telemetry
         double startAngle = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+
+        // Set motor powers for left strafe
+        // Based on teleop: right joystick left (negative) maps to y axis
+        // For left strafe: y is negative in the mecanum formula
+        // Left strafe motor pattern: FL-, BL+, FR+, BR-
+        frontLeftMotor.setPower(-STRAFE_POWER);
+        backLeftMotor.setPower(STRAFE_POWER);
+        frontRightMotor.setPower(STRAFE_POWER);
+        backRightMotor.setPower(-STRAFE_POWER);
+
+        // Strafe left for 200 milliseconds
+        sleep(STRAFE_LEFT_TIME_MS);
 
         // Stop all motors
         stopAllMotors(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor);
@@ -100,6 +121,7 @@ public class EshaTest extends LinearOpMode {
         telemetry.addData("Total Rotation", "%.1f°", finalAngle - startAngle);
         telemetry.addLine("========================================");
         telemetry.addData("Forward Time", "%d ms", FORWARD_TIME_MS);
+        telemetry.addData("Strafe Left Time", "%d ms", STRAFE_LEFT_TIME_MS);
         telemetry.update();
     }
 
