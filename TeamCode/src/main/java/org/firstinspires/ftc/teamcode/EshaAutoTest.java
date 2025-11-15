@@ -14,7 +14,10 @@ public class EshaTest extends LinearOpMode {
     // Motor power constants
     private static final double FORWARD_POWER = 0.5;
     private static final double TURN_POWER = 0.4;
-    private static final double ANGLE_TOLERANCE = 5.0;  // degrees
+    
+    // Timing constants
+    private static final long FORWARD_TIME_MS = 1900;  // 1.9 seconds
+    private static final long TURN_TIME_MS = 300;      // 300 milliseconds
     
     @Override
     public void runOpMode() throws InterruptedException {
@@ -50,8 +53,8 @@ public class EshaTest extends LinearOpMode {
         telemetry.addLine("========================================");
         telemetry.addData("Status", "Initialized");
         telemetry.addLine("Sequence:");
-        telemetry.addLine("1. Move forward for 2 seconds");
-        telemetry.addLine("2. Turn 180 degrees");
+        telemetry.addLine("1. Move forward for 1.9 seconds");
+        telemetry.addLine("2. Turn 180 degrees (300 ms)");
         telemetry.addLine("========================================");
         telemetry.addLine("Press START to begin");
         telemetry.addLine("========================================");
@@ -60,9 +63,10 @@ public class EshaTest extends LinearOpMode {
         waitForStart();
         if (isStopRequested()) return;
 
-        // ========== STEP 1: MOVE FORWARD FOR 2 SECONDS ==========
+        // ========== STEP 1: MOVE FORWARD FOR 1.9 SECONDS ==========
         telemetry.addLine("========================================");
         telemetry.addData("Status", "Moving forward...");
+        telemetry.addData("Duration", "1.9 seconds");
         telemetry.addLine("========================================");
         telemetry.update();
         
@@ -73,8 +77,8 @@ public class EshaTest extends LinearOpMode {
         frontRightMotor.setPower(-FORWARD_POWER);
         frontLeftMotor.setPower(FORWARD_POWER);
         
-        // Move forward for 2 seconds
-        sleep(2000);
+        // Move forward for 1.9 seconds
+        sleep(FORWARD_TIME_MS);
         
         // Stop all motors
         stopAllMotors(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor);
@@ -82,63 +86,24 @@ public class EshaTest extends LinearOpMode {
         // Brief pause before turning
         sleep(500);
 
-        // ========== STEP 2: TURN 180 DEGREES USING GYRO ==========
+        // ========== STEP 2: TURN 180 DEGREES FOR 300 MS ==========
         telemetry.addLine("========================================");
         telemetry.addData("Status", "Turning 180 degrees...");
+        telemetry.addData("Duration", "300 milliseconds");
         telemetry.addLine("========================================");
         telemetry.update();
         
-        // Reset gyro to establish new zero point
-        imu.resetYaw();
-        sleep(100);  // Brief delay to ensure reset completes
+        // Record starting angle for telemetry
+        double startAngle = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
         
-        // Target is 180 degrees from current position (which is now 0)
-        double targetAngle = 180.0;
+        // Turn clockwise: left side forward, right side backward
+        frontLeftMotor.setPower(-TURN_POWER);   // Forward
+        backLeftMotor.setPower(TURN_POWER);     // Forward
+        frontRightMotor.setPower(-TURN_POWER);  // Backward
+        backRightMotor.setPower(TURN_POWER);    // Backward
         
-        // Gyro-controlled turn with proportional control
-        while (opModeIsActive()) {
-            double currentAngle = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
-            double angleError = targetAngle - currentAngle;
-            
-            // Normalize angle error to [-180, 180]
-            while (angleError > 180) angleError -= 360;
-            while (angleError < -180) angleError += 360;
-            
-            // Update telemetry
-            telemetry.addData("Current Angle", "%.1f°", currentAngle);
-            telemetry.addData("Target Angle", "%.1f°", targetAngle);
-            telemetry.addData("Error", "%.1f°", angleError);
-            telemetry.update();
-            
-            // Check if we're close enough to target
-            if (Math.abs(angleError) < ANGLE_TOLERANCE) {
-                break;
-            }
-            
-            // Proportional control: slow down as we approach target
-            double turnSpeed = TURN_POWER;
-            if (Math.abs(angleError) < 30) {
-                // Reduce speed when within 30 degrees
-                turnSpeed = TURN_POWER * (Math.abs(angleError) / 30.0);
-                // Ensure minimum speed to overcome friction
-                turnSpeed = Math.max(turnSpeed, 0.15);
-            }
-            
-            // Turn direction based on error (positive error = turn clockwise)
-            if (angleError > 0) {
-                // Turn clockwise: left side forward, right side backward
-                frontLeftMotor.setPower(-turnSpeed);   // Forward
-                backLeftMotor.setPower(turnSpeed);     // Forward
-                frontRightMotor.setPower(-turnSpeed);  // Backward
-                backRightMotor.setPower(turnSpeed);    // Backward
-            } else {
-                // Turn counter-clockwise: left side backward, right side forward
-                frontLeftMotor.setPower(turnSpeed);    // Backward
-                backLeftMotor.setPower(-turnSpeed);    // Backward
-                frontRightMotor.setPower(turnSpeed);   // Forward
-                backRightMotor.setPower(-turnSpeed);   // Forward
-            }
-        }
+        // Turn for 300 milliseconds
+        sleep(TURN_TIME_MS);
         
         // Stop all motors
         stopAllMotors(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor);
@@ -149,14 +114,17 @@ public class EshaTest extends LinearOpMode {
         telemetry.addLine("========================================");
         double finalAngle = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
         telemetry.addData("Final Angle", "%.1f°", finalAngle);
-        telemetry.addData("Turn Accuracy", "%.1f° from target", Math.abs(180.0 - finalAngle));
+        telemetry.addData("Total Rotation", "%.1f°", finalAngle - startAngle);
+        telemetry.addLine("========================================");
+        telemetry.addData("Forward Time", "%d ms", FORWARD_TIME_MS);
+        telemetry.addData("Turn Time", "%d ms", TURN_TIME_MS);
         telemetry.update();
     }
     
-    private void stopAllMotors(DcMotor fl, DcMotor bl, DcMotor fr, DcMotor br) {
-        fl.setPower(0);
-        bl.setPower(0);
-        fr.setPower(0);
-        br.setPower(0);
+    private void stopAllMotors(DcMotor frontLeftMotor, DcMotor backLeftMotor, DcMotor frontRightMotor, DcMotor backRightMotor) {
+        frontLeftMotor.setPower(0);
+        backLeftMotor.setPower(0);
+        frontRightMotor.setPower(0);
+        backRightMotor.setPower(0);
     }
 }
