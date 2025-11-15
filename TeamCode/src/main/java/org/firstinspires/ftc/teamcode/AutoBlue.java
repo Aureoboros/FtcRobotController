@@ -59,7 +59,7 @@ public class AutoBlue extends LinearOpMode {
     private static final double BLUE_DEFAULT_START_X = 4.0;
     private static final double BLUE_DEFAULT_START_Y = -5.0;
 
-    // Odometry tracking (will be set based on actual start position)
+    // Tracking (will be set based on actual start position)
     private double robotX = 0.0;
     private double robotY = 0.0;
     private double robotHeading = 0.0;
