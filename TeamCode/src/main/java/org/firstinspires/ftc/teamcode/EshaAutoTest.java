@@ -8,8 +8,8 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 
-@Autonomous(name = "EshaTest")
-public class EshaTest extends LinearOpMode {
+@Autonomous(name = "EshaAutoTest")
+public class EshaAutoTest extends LinearOpMode {
 
     // Motor power constants
     private static final double FORWARD_POWER = 0.5;
