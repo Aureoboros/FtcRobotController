@@ -528,4 +528,131 @@ public class OfficialTeleop1 extends LinearOpMode {
 
             if ((currentGamepad1.b && !previousGamepad1.b) ||
                     (currentGamepad2.b && !previousGamepad2.b)) {
-                intakeForwardActive = !intakeForwar
+                intakeForwardActive = !intakeForwardActive;
+                if (intakeForwardActive) intakeReverseActive = false;
+            }
+
+            if ((currentGamepad1.a && !previousGamepad1.a) ||
+                    (currentGamepad2.a && !previousGamepad2.a)) {
+                intakeReverseActive = !intakeReverseActive;
+                if (intakeReverseActive) intakeForwardActive = false;
+            }
+
+            double intakePower = 0;
+            String intakeStatus = "STOPPED";
+            if (intakeForwardActive) {
+                double speedToUse = intakeHalfSpeed ? INTAKE_HALF_POWER : INTAKE_FULL_POWER;
+                intakePower = speedToUse;
+                intakeStatus = "FORWARD (" + (intakeHalfSpeed ? "50%" : "100%") + ")";
+            } else if (intakeReverseActive) {
+                double speedToUse = intakeHalfSpeed ? INTAKE_HALF_POWER : INTAKE_FULL_POWER;
+                intakePower = -speedToUse;
+                intakeStatus = "REVERSE (" + (intakeHalfSpeed ? "50%" : "100%") + ")";
+            }
+            intakeMotor.setPower(Range.clip(intakePower, -1.0, 1.0));
+
+            // ========== LAUNCH MOTOR CONTROL (BOTH GAMEPADS) ==========
+            if ((currentGamepad1.x && !previousGamepad1.x) ||
+                    (currentGamepad2.x && !previousGamepad2.x)) {
+                launchMotorActive = !launchMotorActive;
+                sleep(500);
+                rampMotor.setPower(RAMP_MOTOR_POWER);
+            }
+
+            double launchPower = 0;
+            double rampPower = 0;
+            String launchStatus = "STOPPED";
+            if (launchMotorActive) {
+                launchPower = -LAUNCH_MOTOR_POWER;
+                rampPower = RAMP_MOTOR_POWER;
+                launchStatus = "RUNNING";
+            }
+            launchMotor.setPower(Range.clip(launchPower, -1.0, 1.0));
+            rampMotor.setPower(Range.clip(rampPower, -1.0, 1.0));
+
+            // ========== RB BUTTON - ROTATE TO FIND TAG ==========
+            if ((currentGamepad1.right_bumper && !previousGamepad1.right_bumper) ||
+                    (currentGamepad2.right_bumper && !previousGamepad2.right_bumper)) {
+                if (!rotatingToTag) {
+                    rotatingToTag = true;
+                    rbRotationStartHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+                    rbLastHeading = rbRotationStartHeading;
+                    rbCumulativeRotation = 0.0;
+                } else {
+                    rotatingToTag = false;
+                }
+            }
+
+            if (rotatingToTag) {
+                robotHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+                double currentHeadingChange = robotHeading - rbLastHeading;
+                
+                // Normalize heading change to [-π, π]
+                while (currentHeadingChange > Math.PI) currentHeadingChange -= 2 * Math.PI;
+                while (currentHeadingChange < -Math.PI) currentHeadingChange += 2 * Math.PI;
+                
+                rbCumulativeRotation += Math.abs(currentHeadingChange);
+                rbLastHeading = robotHeading;
+                
+                // Check if we've rotated 360 degrees
+                if (rbCumulativeRotation >= 2 * Math.PI) {
+                    rotatingToTag = false;
+                    rbCumulativeRotation = 0.0;
+                } else {
+                    rx = RB_ROTATION_SPEED;
+                    x = 0;
+                    y = 0;
+                    autoStatus = "SEARCHING FOR TAG...";
+                }
+            }
+
+            // ========== ENHANCED TELEMETRY ==========
+            telemetry.addLine("========== MATCH MODE ==========");
+            telemetry.addLine();
+            telemetry.addData("Alliance", selectedAlliance);
+            telemetry.addData("Active Driver", activeDriver);
+            telemetry.addLine();
+            telemetry.addData("Drive Mode", autoStatus);
+            if (autoAligning) {
+                telemetry.addData(">>> AUTO-ALIGN", "ACTIVE <<<");
+            }
+            if (autoNavigatingToPosition) {
+                telemetry.addData(">>> AUTO-NAV", "ACTIVE <<<");
+            }
+            telemetry.addLine();
+            telemetry.addData("Intake", intakeStatus);
+            telemetry.addData("Launch", launchStatus);
+            telemetry.addLine();
+            telemetry.addData("Robot Position", "X: %.2f ft, Y: %.2f ft", robotX, robotY);
+            telemetry.addData("Robot Heading", "%.1f°", Math.toDegrees(robotHeading));
+            telemetry.update();
+        }
+    }
+
+    // ========== HELPER METHODS ==========
+    private AprilTagDetection getAprilTagDetection(int targetId) {
+        List<AprilTagDetection> detections = aprilTag.getDetections();
+        for (AprilTagDetection detection : detections) {
+            if (detection.id == targetId) {
+                return detection;
+            }
+        }
+        return null;
+    }
+
+    private void calculatePositionFromTag(AprilTagDetection tag, double tagX, double tagY, IMU imu) {
+        double rangeToTag = tag.ftcPose.range / 12.0;
+        double bearingToTag = Math.toRadians(tag.ftcPose.bearing);
+        double currentHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+        double absoluteAngleToTag = currentHeading + bearingToTag;
+        robotX = tagX - rangeToTag * Math.sin(absoluteAngleToTag);
+        robotY = tagY - rangeToTag * Math.cos(absoluteAngleToTag);
+    }
+
+    private double applyDeadzone(double value) {
+        if (Math.abs(value) < JOYSTICK_DEADZONE) {
+            return 0.0;
+        }
+        return value;
+    }
+}

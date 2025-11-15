@@ -227,7 +227,11 @@ public class AutoBlue extends LinearOpMode {
 
         // Mechanism motors
         intakeMotor = hardwareMap.dcMotor.get("intakeMotor");
+<<<<<<< Updated upstream
         launchMotor = hardwareMap.dcMotor.get("launchMotor1");
+=======
+        launchMotor = hardwareMap.dcMotor.get("launchMotor");
+>>>>>>> Stashed changes
         rampMotor = hardwareMap.dcMotor.get("rampMotor");
 
         // Set motor modes
