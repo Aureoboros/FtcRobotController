@@ -12,8 +12,8 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
 
-@Autonomous(name="AutoFRBlue", group="Autonomous")
-public class AutoBlue extends LinearOpMode {
+@Autonomous(name="BlueAuto", group="Autonomous")
+public class BlueAuto extends LinearOpMode {
 
     // Motor power constants
     private static final double INTAKE_POWER = 1.0;
@@ -243,9 +243,11 @@ public class AutoBlue extends LinearOpMode {
         launchMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rampMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // Reverse right side motors
-        frontRightMotor.setDirection(DcMotorSimple.Direction.REVERSE);
-        backRightMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        // Set motor directions - all motors set to FORWARD (matches current motor settings)
+        frontLeftMotor.setDirection(DcMotorSimple.Direction.FORWARD);
+        backLeftMotor.setDirection(DcMotorSimple.Direction.FORWARD);
+        frontRightMotor.setDirection(DcMotorSimple.Direction.FORWARD);
+        backRightMotor.setDirection(DcMotorSimple.Direction.FORWARD);
 
         // Initialize IMU
         imu = hardwareMap.get(IMU.class, "imu");
@@ -422,14 +424,26 @@ public class AutoBlue extends LinearOpMode {
             double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
             double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
 
-            rotX = rotX * 1.1;  // Strafe correction
+            // Mecanum wheel formula (matches current motor settings from SVTestTeleop12nov.java)
+            // Note: y is inverted in the formula to match motor wiring
+            double frontLeftPower = -rotY + rotX + rx;
+            double backLeftPower = -rotY - rotX + rx;
+            double frontRightPower = -rotY - rotX - rx;
+            double backRightPower = -rotY + rotX - rx;
 
-            // Calculate motor powers
-            double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx), 1);
-            double frontLeftPower = (rotY + rotX + rx) / denominator;
-            double backLeftPower = (rotY - rotX + rx) / denominator;
-            double frontRightPower = (rotY - rotX - rx) / denominator;
-            double backRightPower = (rotY + rotX - rx) / denominator;
+            // Find the maximum absolute power to maintain proportional relationships
+            double maxPower = Math.max(Math.abs(frontLeftPower), Math.abs(backLeftPower));
+            maxPower = Math.max(maxPower, Math.abs(frontRightPower));
+            maxPower = Math.max(maxPower, Math.abs(backRightPower));
+
+            // Scale down proportionally if any power exceeds 1.0
+            if (maxPower > 1.0) {
+                double scale = 1.0 / maxPower;
+                frontLeftPower *= scale;
+                backLeftPower *= scale;
+                frontRightPower *= scale;
+                backRightPower *= scale;
+            }
 
             frontLeftMotor.setPower(frontLeftPower);
             backLeftMotor.setPower(backLeftPower);
