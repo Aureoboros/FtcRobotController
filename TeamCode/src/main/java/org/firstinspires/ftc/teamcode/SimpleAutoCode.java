@@ -36,7 +36,7 @@ public class SimpleAutoCode extends LinearOpMode{
         frontRightMotor.setPower(-0.5);
         backRightMotor.setPower(-0.5);
 
-        sleep(1000);
+        sleep(2000);
 
         frontLeftMotor.setPower(0);
         backLeftMotor.setPower(0);
