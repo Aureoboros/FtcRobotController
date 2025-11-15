@@ -17,7 +17,7 @@ public class EshaAutoTest extends LinearOpMode {
     
     // Timing constants
     private static final long FORWARD_TIME_MS = 1900;  // 1.9 seconds
-    private static final long TURN_TIME_MS = 300;      // 300 milliseconds
+    private static final long TURN_TIME_MS = 1200;      // 1200 milliseconds
     
     @Override
     public void runOpMode() throws InterruptedException {
@@ -54,7 +54,7 @@ public class EshaAutoTest extends LinearOpMode {
         telemetry.addData("Status", "Initialized");
         telemetry.addLine("Sequence:");
         telemetry.addLine("1. Move forward for 1.9 seconds");
-        telemetry.addLine("2. Turn 180 degrees (300 ms)");
+        telemetry.addLine("2. Turn 180 degrees (1200 ms)");
         telemetry.addLine("========================================");
         telemetry.addLine("Press START to begin");
         telemetry.addLine("========================================");
