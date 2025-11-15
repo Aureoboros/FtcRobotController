@@ -66,7 +66,7 @@ public class AutoBlue extends LinearOpMode {
 
     // Hardware
     private DcMotor frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor;
-    private DcMotor intakeMotor, launchMotor1, rampMotor;
+    private DcMotor intakeMotor, launchMotor, rampMotor;
     private IMU imu;
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
@@ -227,7 +227,7 @@ public class AutoBlue extends LinearOpMode {
 
         // Mechanism motors
         intakeMotor = hardwareMap.dcMotor.get("intakeMotor");
-        launchMotor1 = hardwareMap.dcMotor.get("launchMotor1");
+        launchMotor = hardwareMap.dcMotor.get("launchMotor1");
         rampMotor = hardwareMap.dcMotor.get("rampMotor");
 
         // Set motor modes
@@ -240,7 +240,7 @@ public class AutoBlue extends LinearOpMode {
         frontRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         intakeMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        launchMotor1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        launchMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rampMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // Reverse right side motors
@@ -387,7 +387,7 @@ public class AutoBlue extends LinearOpMode {
 
     private void shootBalls(double duration) {
         // Spin up launch motors
-        launchMotor1.setPower(LAUNCH_MOTOR_POWER);
+        launchMotor.setPower(LAUNCH_MOTOR_POWER);
         sleep(500);  // Spin-up time;
     }
 
@@ -421,7 +421,7 @@ public class AutoBlue extends LinearOpMode {
         private void stopAllMotors () {
             stopDriveMotors();
             intakeMotor.setPower(0);
-            launchMotor1.setPower(0);
+            launchMotor.setPower(0);
             rampMotor.setPower(0);
         }
 
