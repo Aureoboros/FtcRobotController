@@ -114,7 +114,7 @@ public class AutoRedBackStart  extends LinearOpMode {
             backLeftMotor.setPower(rtPower);  // Forward (positive = forward)
             frontRightMotor.setPower(-rtPower);  // Backward (negative = backward)
             backRightMotor.setPower(rtPower);  // Backward (positive = backward)
-            sleep(325);   // Rotate for 0.325 seconds (adjust if needed for 45 degrees)
+            sleep(300);   // Rotate for 0.3 seconds (adjust if needed for 45 degrees)
             
             // Stop all drive motors
             stopDriveMotors(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor);
