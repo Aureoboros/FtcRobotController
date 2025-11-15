@@ -382,13 +382,39 @@ public class AutoBlue extends LinearOpMode {
         intakeMotor.setPower(INTAKE_POWER);
         driveToPosition(spike_x + 2.0, spike_y, 0);
         sleep((long)(duration * 1000));
-        intakeMotor.setPower(0);
+        //intakeMotor.setPower(0);
+
+        launchMotor.setPower(0);  // Stop launch motor
+        sleep(500);  // Wait 500ms
+        intakeMotor.setPower(1.0);  // Start intake motor (power = 1.0)
+        rampMotor.setPower(-0.5);  // Start ramp motor in reverse direction (power = 0.5)
+        launchMotor.setPower(-0.8);  // Start launch motor in reverse (power = -0.7)
+
     }
 
     private void shootBalls(double duration) {
         // Spin up launch motors
-        launchMotor.setPower(LAUNCH_MOTOR_POWER);
-        sleep(500);  // Spin-up time;
+        //launchMotor.setPower(LAUNCH_MOTOR_POWER);
+        //sleep(1500);  // Spin-up time;
+
+        // Stop intake and ramp
+        intakeMotor.setPower(0);
+        rampMotor.setPower(0);
+
+        frontLeftMotor.setPower(0);
+        backLeftMotor.setPower(0);
+        frontRightMotor.setPower(0);
+        backRightMotor.setPower(0);
+
+        launchMotor.setPower(0);
+        sleep(1000);
+        launchMotor.setPower(0.8);
+        sleep(1500);
+
+        // Start feeding
+        intakeMotor.setPower(1.0);
+        rampMotor.setPower(-0.4);  // Reverse power during launch (40% speed)
+
     }
 
         private void driveFieldCentric ( double x, double y, double rx, double botHeading){
