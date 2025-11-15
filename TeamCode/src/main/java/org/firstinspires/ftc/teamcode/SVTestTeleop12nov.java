@@ -198,7 +198,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
         boolean rampMotorActive = false;
         boolean launchMotorReverse = false;  // Flag for reverse launch motor mode (Y button)
         boolean wheelsLocked = false;  // Flag to lock wheels during launch
-        double runtimeLaunchMotorPower = 0.7;  // Runtime adjustable launch motor power (default 0.7, min 0.5, max 0.90)
+        double runtimeLaunchMotorPower = 0.8;  // Runtime adjustable launch motor power (default 0.8, min 0.5, max 0.90)
 
         waitForStart();
         if (isStopRequested()) return;
@@ -809,9 +809,9 @@ public class SVTestTeleop12nov extends LinearOpMode {
                     x = leftStickY;  // x controls forward/backward (swapped from standard)
                     
                     // Right joystick X controls left/right strafe
-                    // Map to y axis (swapped) - positive y = left, negative y = right (from dpad mapping)
-                    // right_stick_x is negative when pushed left, so invert it
-                    double rightStickX = -currentGamepad2.right_stick_x;  // Invert for left = positive y
+                    // Map to y axis (swapped) - negative y = left, positive y = right (corrected mapping)
+                    // right_stick_x is negative when pushed left, positive when pushed right
+                    double rightStickX = currentGamepad2.right_stick_x;  // Direct mapping (no inversion) - same as gamepad1
                     y = rightStickX;  // y controls left/right (swapped from standard)
                     
                     // Rotation control from triggers - DISABLED
