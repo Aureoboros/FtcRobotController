@@ -198,7 +198,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
         boolean rampMotorActive = false;
         boolean launchMotorReverse = false;  // Flag for reverse launch motor mode (Y button)
         boolean wheelsLocked = false;  // Flag to lock wheels during launch
-        double runtimeLaunchMotorPower = 0.6;  // Runtime adjustable launch motor power (default 0.6, min 0.5, max 0.75)
+        double runtimeLaunchMotorPower = 0.7;  // Runtime adjustable launch motor power (default 0.7, min 0.5, max 0.90)
 
         waitForStart();
         if (isStopRequested()) return;
@@ -1077,15 +1077,16 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 if (!launchMotorActive) {
                     launchMotorActive = true;
                     launchMotor.setPower(runtimeLaunchMotorPower);  // Use runtime adjustable power
-                    sleep(3000);  // Wait for launch motor to spin up
+                    //launchMotor.setPower(0.65);
+                    sleep(1000);  // Wait for launch motor to spin up
                 } else {
                     // Already running, just wait a moment
-                    sleep(500);
+                    sleep(1000);
                 }
                 
                 // Start feeding
                 intakeMotor.setPower(1.0);
-                rampMotor.setPower(-0.85);  // Reverse power during launch (85% speed)
+                rampMotor.setPower(-0.4);  // Reverse power during launch (40% speed)
             }
             
             // Unlock wheels when launch is done
@@ -1095,7 +1096,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
             
             // ========== BACK + DPAD UP/DOWN - DYNAMIC LAUNCH MOTOR SPEED ADJUSTMENT (LAUNCH MODE ONLY) ==========
             // Only works when launch motor is active (launch mode)
-            // BACK + DPAD UP: increase speed by 0.05 (max 0.75)
+            // BACK + DPAD UP: increase speed by 0.05 (max 0.90)
             // BACK + DPAD DOWN: decrease speed by 0.05 (min 0.5)
             if (launchMotorActive && !launchMotorReverse) {
                 // Check for BACK + DPAD UP combination
@@ -1113,8 +1114,8 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 // Increase speed (BACK + DPAD UP)
                 if ((backDpadUpG1 && !backDpadUpPrevG1) || (backDpadUpG2 && !backDpadUpPrevG2)) {
                     runtimeLaunchMotorPower += 0.05;
-                    if (runtimeLaunchMotorPower > 0.75) {
-                        runtimeLaunchMotorPower = 0.75;  // Clamp to max 0.75
+                    if (runtimeLaunchMotorPower > 0.90) {
+                        runtimeLaunchMotorPower = 0.90;  // Clamp to max 0.90
                     }
                     
                     // Round to 2 decimal places to avoid floating point issues
