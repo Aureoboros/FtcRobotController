@@ -24,9 +24,9 @@ private static final double OBELISK_X = 0.0;   // Obelisk X
 private static final double OBELISK_Y = 6.0;   // Obelisk Y
 
 // Target Positions (based on alliance) - in inches
-private static final double BLUE_TARGET_X_INCHES = -3.0;  // inches
+private static final double BLUE_TARGET_X_INCHES = 0.0;   // inches
 private static final double BLUE_TARGET_Y_INCHES = 3.0;   // inches
-private static final double RED_TARGET_X_INCHES = -3.0;   // inches
+private static final double RED_TARGET_X_INCHES = 0.0;    // inches
 private static final double RED_TARGET_Y_INCHES = -3.0;   // inches
 
 // Target Positions in feet (for calculations)
