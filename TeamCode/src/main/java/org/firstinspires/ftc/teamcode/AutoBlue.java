@@ -447,7 +447,7 @@ public class AutoBlue extends LinearOpMode {
             // Scale down proportionally if any power exceeds maxDrivePower
             // This preserves the motor power ratios while respecting the power limit
             if (maxPower > 1.0) {
-                double scale = maxDrivePower / maxPower;
+                double scale = 1.0 / maxPower;
                 frontLeftPower *= scale;
                 backLeftPower *= scale;
                 frontRightPower *= scale;
