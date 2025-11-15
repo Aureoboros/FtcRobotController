@@ -8,17 +8,16 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 
-@Autonomous(name = "EshaAutoTest")
-public class EshaAutoTest extends LinearOpMode {
-    
+@Autonomous(name = "EshaTest")
+public class EshaTest extends LinearOpMode {
+
     // Motor power constants
     private static final double FORWARD_POWER = 0.5;
-    private static final double TURN_POWER = 0.4;
-    
+
     // Timing constants
     private static final long FORWARD_TIME_MS = 1900;  // 1.9 seconds
-    private static final long TURN_TIME_MS = 1200;      // 1200 milliseconds
-    
+  
+
     @Override
     public void runOpMode() throws InterruptedException {
         // ========== HARDWARE INITIALIZATION ==========
@@ -54,7 +53,6 @@ public class EshaAutoTest extends LinearOpMode {
         telemetry.addData("Status", "Initialized");
         telemetry.addLine("Sequence:");
         telemetry.addLine("1. Move forward for 1.9 seconds");
-        telemetry.addLine("2. Turn 180 degrees (1200 ms)");
         telemetry.addLine("========================================");
         telemetry.addLine("Press START to begin");
         telemetry.addLine("========================================");
@@ -69,42 +67,27 @@ public class EshaAutoTest extends LinearOpMode {
         telemetry.addData("Duration", "1.9 seconds");
         telemetry.addLine("========================================");
         telemetry.update();
-        
+
         // Set motor powers for forward movement
         // Forward: BR+, BL-, FR-, FL+
         backRightMotor.setPower(FORWARD_POWER);
         backLeftMotor.setPower(-FORWARD_POWER);
         frontRightMotor.setPower(-FORWARD_POWER);
         frontLeftMotor.setPower(FORWARD_POWER);
-        
+
         // Move forward for 1.9 seconds
         sleep(FORWARD_TIME_MS);
-        
+
         // Stop all motors
         stopAllMotors(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor);
-        
+
         // Brief pause before turning
         sleep(500);
-
-        // ========== STEP 2: TURN 180 DEGREES FOR 300 MS ==========
-        telemetry.addLine("========================================");
-        telemetry.addData("Status", "Turning 180 degrees...");
-        telemetry.addData("Duration", "300 milliseconds");
-        telemetry.addLine("========================================");
-        telemetry.update();
         
+
         // Record starting angle for telemetry
         double startAngle = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
-        
-        // Turn clockwise: left side forward, right side backward
-        frontLeftMotor.setPower(-TURN_POWER);   // Forward
-        backLeftMotor.setPower(TURN_POWER);     // Forward
-        frontRightMotor.setPower(-TURN_POWER);  // Backward
-        backRightMotor.setPower(TURN_POWER);    // Backward
-        
-        // Turn for 300 milliseconds
-        sleep(TURN_TIME_MS);
-        
+
         // Stop all motors
         stopAllMotors(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor);
 
@@ -117,10 +100,9 @@ public class EshaAutoTest extends LinearOpMode {
         telemetry.addData("Total Rotation", "%.1f°", finalAngle - startAngle);
         telemetry.addLine("========================================");
         telemetry.addData("Forward Time", "%d ms", FORWARD_TIME_MS);
-        telemetry.addData("Turn Time", "%d ms", TURN_TIME_MS);
         telemetry.update();
     }
-    
+
     private void stopAllMotors(DcMotor frontLeftMotor, DcMotor backLeftMotor, DcMotor frontRightMotor, DcMotor backRightMotor) {
         frontLeftMotor.setPower(0);
         backLeftMotor.setPower(0);
