@@ -6,6 +6,8 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.util.Range;
+
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
@@ -227,11 +229,7 @@ public class AutoBlue extends LinearOpMode {
 
         // Mechanism motors
         intakeMotor = hardwareMap.dcMotor.get("intakeMotor");
-<<<<<<< Updated upstream
-        launchMotor = hardwareMap.dcMotor.get("launchMotor1");
-=======
         launchMotor = hardwareMap.dcMotor.get("launchMotor");
->>>>>>> Stashed changes
         rampMotor = hardwareMap.dcMotor.get("rampMotor");
 
         // Set motor modes
@@ -429,11 +427,39 @@ public class AutoBlue extends LinearOpMode {
             rotX = rotX * 1.1;  // Strafe correction
 
             // Calculate motor powers
-            double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx), 1);
-            double frontLeftPower = (rotY + rotX + rx) / denominator;
-            double backLeftPower = (rotY - rotX + rx) / denominator;
-            double frontRightPower = (rotY - rotX - rx) / denominator;
-            double backRightPower = (rotY + rotX - rx) / denominator;
+            //double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx), 1);
+            //double frontLeftPower = (rotY + rotX + rx) / denominator;
+            //double backLeftPower = (rotY - rotX + rx) / denominator;
+            //double frontRightPower = (rotY - rotX - rx) / denominator;
+            //double backRightPower = (rotY + rotX - rx) / denominator;
+
+
+            double frontLeftPower = -rotY + rotX + rx;
+            double backLeftPower = -rotY - rotX + rx;  // Inverted y for proper strafe
+            double frontRightPower = -rotY - rotX - rx;
+            double backRightPower = -rotY + rotX - rx;  // Inverted y for proper strafe
+
+            // Find the maximum absolute power to maintain proportional relationships
+            double maxPower = Math.max(Math.abs(frontLeftPower), Math.abs(backLeftPower));
+            maxPower = Math.max(maxPower, Math.abs(frontRightPower));
+            maxPower = Math.max(maxPower, Math.abs(backRightPower));
+
+            // Scale down proportionally if any power exceeds maxDrivePower
+            // This preserves the motor power ratios while respecting the power limit
+            if (maxPower > 1.0) {
+                double scale = maxDrivePower / maxPower;
+                frontLeftPower *= scale;
+                backLeftPower *= scale;
+                frontRightPower *= scale;
+                backRightPower *= scale;
+            }
+
+            // Clamp all motor powers to ±0.5 to ensure they never exceed the limit
+            frontLeftPower = Range.clip(frontLeftPower, -0.5, 0.5);
+            backLeftPower = Range.clip(backLeftPower, -0.5, 0.5);
+            frontRightPower = Range.clip(frontRightPower, -0.5, 0.5);
+            backRightPower = Range.clip(backRightPower, -0.5, 0.5);
+
 
             frontLeftMotor.setPower(frontLeftPower);
             backLeftMotor.setPower(backLeftPower);
