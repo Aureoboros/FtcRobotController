@@ -198,7 +198,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
         boolean rampMotorActive = false;
         boolean launchMotorReverse = false;  // Flag for reverse launch motor mode (Y button)
         boolean wheelsLocked = false;  // Flag to lock wheels during launch
-        double runtimeLaunchMotorPower = 0.8;  // Runtime adjustable launch motor power (default 0.8, min 0.5, max 0.90)
+        double runtimeLaunchMotorPower = 0.75;  // Runtime adjustable launch motor power (default 0.75, min 0.5, max 0.90)
 
         waitForStart();
         if (isStopRequested()) return;
@@ -1094,11 +1094,11 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 wheelsLocked = false;
             }
             
-            // ========== BACK + DPAD UP/DOWN - DYNAMIC LAUNCH MOTOR SPEED ADJUSTMENT (LAUNCH MODE ONLY) ==========
-            // Only works when launch motor is active (launch mode)
+            // ========== BACK + DPAD UP/DOWN - DYNAMIC LAUNCH MOTOR SPEED ADJUSTMENT (ALWAYS AVAILABLE) ==========
+            // Works in both launch mode and non-launch mode
             // BACK + DPAD UP: increase speed by 0.05 (max 0.90)
             // BACK + DPAD DOWN: decrease speed by 0.05 (min 0.5)
-            if (launchMotorActive && !launchMotorReverse) {
+            if (!launchMotorReverse) {  // Only block adjustment during reverse mode
                 // Check for BACK + DPAD UP combination
                 boolean backDpadUpG1 = currentGamepad1.back && currentGamepad1.dpad_up;
                 boolean backDpadUpG2 = currentGamepad2.back && currentGamepad2.dpad_up;
@@ -1121,8 +1121,10 @@ public class SVTestTeleop12nov extends LinearOpMode {
                     // Round to 2 decimal places to avoid floating point issues
                     runtimeLaunchMotorPower = Math.round(runtimeLaunchMotorPower * 100.0) / 100.0;
                     
-                    // Update launch motor power immediately
-                    launchMotor.setPower(runtimeLaunchMotorPower);
+                    // Update launch motor power immediately if active
+                    if (launchMotorActive) {
+                        launchMotor.setPower(runtimeLaunchMotorPower);
+                    }
                     
                     telemetry.addLine("Launch Motor Speed: " + String.format("%.2f", runtimeLaunchMotorPower) + " (INCREASED)");
                 }
@@ -1137,8 +1139,10 @@ public class SVTestTeleop12nov extends LinearOpMode {
                     // Round to 2 decimal places to avoid floating point issues
                     runtimeLaunchMotorPower = Math.round(runtimeLaunchMotorPower * 100.0) / 100.0;
                     
-                    // Update launch motor power immediately
-                    launchMotor.setPower(runtimeLaunchMotorPower);
+                    // Update launch motor power immediately if active
+                    if (launchMotorActive) {
+                        launchMotor.setPower(runtimeLaunchMotorPower);
+                    }
                     
                     telemetry.addLine("Launch Motor Speed: " + String.format("%.2f", runtimeLaunchMotorPower) + " (DECREASED)");
                 }
@@ -1309,7 +1313,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
             telemetry.addData("Intake", intakeStatus);
             telemetry.addData("Launch", launchStatus);
             telemetry.addData("Launch Motor Speed", "%.2f", launchPower);
-            if (launchMotorActive && !launchMotorReverse) {
+            if (!launchMotorReverse) {
                 telemetry.addData("Launch Motor Speed (Target)", "%.2f (BACK+DPAD UP/DOWN to adjust)", runtimeLaunchMotorPower);
             } else {
                 telemetry.addData("Launch Motor Speed (Target)", "%.2f", runtimeLaunchMotorPower);
