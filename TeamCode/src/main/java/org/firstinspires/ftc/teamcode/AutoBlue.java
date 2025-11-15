@@ -32,11 +32,6 @@ public class AutoBlue extends LinearOpMode {
     private static final double APRILTAG_ROTATION_POWER = 0.25;
     private static final int TARGET_APRILTAG_ID = 20;  // Blue alliance goal
 
-    // Dead wheel odometry constants
-    private static final double ODO_COUNTS_PER_REV = 8192.0;
-    private static final double ODO_WHEEL_DIAMETER_INCHES = 1.26;
-    private static final double ODO_COUNTS_PER_INCH = ODO_COUNTS_PER_REV / (ODO_WHEEL_DIAMETER_INCHES * Math.PI);
-
     // AprilTag IDs
     private static final int[] OBELISK_APRILTAG_IDS = {21, 22, 23};  // Obelisk tags for positioning
 
@@ -64,17 +59,14 @@ public class AutoBlue extends LinearOpMode {
     private static final double BLUE_DEFAULT_START_X = 4.0;
     private static final double BLUE_DEFAULT_START_Y = -5.0;
 
-    // Odometry tracking (will be set based on actual start position)
+    // Tracking (will be set based on actual start position)
     private double robotX = 0.0;
     private double robotY = 0.0;
     private double robotHeading = 0.0;
-    private int lastForwardOdoPos = 0;
-    private int lastRightOdoPos = 0;
 
     // Hardware
     private DcMotor frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor;
     private DcMotor intakeMotor, launchMotor1, rampMotor;
-    private DcMotor forwardOdo, rightOdo;
     private IMU imu;
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
@@ -242,15 +234,6 @@ public class AutoBlue extends LinearOpMode {
         intakeMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         rampMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
-        // Dead wheel encoders
-        forwardOdo = hardwareMap.dcMotor.get("forwardOdo");
-        rightOdo = hardwareMap.dcMotor.get("rightOdo");
-
-        forwardOdo.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        rightOdo.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        forwardOdo.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        rightOdo.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-
         // Set brake mode
         frontLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -291,8 +274,6 @@ public class AutoBlue extends LinearOpMode {
         double timeout = 5.0;  // 5 second timeout per movement
 
         while (opModeIsActive() && (getRuntime() - startTime) < timeout) {
-            updateOdometry();
-
             double deltaX = targetX - robotX;
             double deltaY = targetY - robotY;
             double distanceToTarget = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -344,8 +325,6 @@ public class AutoBlue extends LinearOpMode {
         boolean aligned = false;
 
         while (opModeIsActive() && (getRuntime() - startTime) < timeout && !aligned) {
-            updateOdometry();
-
             AprilTagDetection detection = getAprilTagDetection(targetTagId);
 
             if (detection != null) {
@@ -444,32 +423,6 @@ public class AutoBlue extends LinearOpMode {
             intakeMotor.setPower(0);
             launchMotor1.setPower(0);
             rampMotor.setPower(0);
-        }
-
-        private void updateOdometry () {
-            int forwardPos = forwardOdo.getCurrentPosition();
-            int rightPos = rightOdo.getCurrentPosition();
-
-            int deltaForward = forwardPos - lastForwardOdoPos;
-            int deltaRight = rightPos - lastRightOdoPos;
-
-            lastForwardOdoPos = forwardPos;
-            lastRightOdoPos = rightPos;
-
-            double forwardInches = deltaForward / ODO_COUNTS_PER_INCH;
-            double rightInches = deltaRight / ODO_COUNTS_PER_INCH;
-
-            double currentHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-
-            double robotDX = rightInches;
-            double robotDY = forwardInches;
-
-            double fieldDX = robotDX * Math.cos(currentHeading) - robotDY * Math.sin(currentHeading);
-            double fieldDY = robotDX * Math.sin(currentHeading) + robotDY * Math.cos(currentHeading);
-
-            robotX += fieldDX / 12.0;
-            robotY += fieldDY / 12.0;
-            robotHeading = currentHeading;
         }
 
         private AprilTagDetection getAprilTagDetection ( int targetId){
