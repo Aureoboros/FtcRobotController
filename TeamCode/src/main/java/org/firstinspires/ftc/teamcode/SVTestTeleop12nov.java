@@ -33,8 +33,8 @@ public class SVTestTeleop12nov extends LinearOpMode {
     private static final boolean GAMEPAD2_ACTIVE = true;
 
     // Driver-specific power limits
-    private static final double GAMEPAD1_MAX_POWER = 1.0;
-    private static final double GAMEPAD2_MAX_POWER = 0.5;
+    private static final double GAMEPAD1_MAX_POWER = 0.5;  // Limited to 0.5 max speed
+    private static final double GAMEPAD2_MAX_POWER = 0.5;  // Limited to 0.5 max speed
     private static final double DPAD_POWER = 0.8;
 
     // ========== APRILTAG ALIGNMENT CONSTANTS ==========
@@ -198,7 +198,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
         boolean rampMotorActive = false;
         boolean launchMotorReverse = false;  // Flag for reverse launch motor mode (Y button)
         boolean wheelsLocked = false;  // Flag to lock wheels during launch
-        double runtimeLaunchMotorPower = 0.5;  // Runtime adjustable launch motor power (default 0.5, min 0.5, max 0.75)
+        double runtimeLaunchMotorPower = 0.6;  // Runtime adjustable launch motor power (default 0.6, min 0.5, max 0.75)
 
         waitForStart();
         if (isStopRequested()) return;
@@ -901,6 +901,12 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 frontRightPower *= scale;
                 backRightPower *= scale;
             }
+            
+            // Clamp all motor powers to ±0.5 to ensure they never exceed the limit
+            frontLeftPower = Range.clip(frontLeftPower, -0.5, 0.5);
+            backLeftPower = Range.clip(backLeftPower, -0.5, 0.5);
+            frontRightPower = Range.clip(frontRightPower, -0.5, 0.5);
+            backRightPower = Range.clip(backRightPower, -0.5, 0.5);
 
             // Set motor powers
             // RB Override: Rotate slowly until Tag 20 detected (takes highest priority)
@@ -944,24 +950,26 @@ public class SVTestTeleop12nov extends LinearOpMode {
             }
             // LB/LT Override: Control all 4 wheels (takes priority after RB)
             // Front left: backward, Back left: backward, Front right: forward, Back right: forward
-            // LB (bumper) is binary (full power), LT (trigger) is proportional (0.0 to 1.0)
+            // LB (bumper) is binary (limited to 0.5), LT (trigger) is proportional (0.0 to 0.5)
             else if (currentGamepad1.left_bumper || currentGamepad2.left_bumper) {
-                // LB: Full power (binary)
-                frontLeftMotor.setPower(1.0);  // Backward at full power (positive = backward for this motor)
-                backLeftMotor.setPower(-1.0);  // Backward at full power (negative = backward for this motor)
-                frontRightMotor.setPower(1.0);  // Forward at full power (positive = forward for this motor)
-                backRightMotor.setPower(-1.0);  // Forward at full power (negative = forward for this motor)
+                // LB: Limited to 0.5 max speed
+                frontLeftMotor.setPower(0.5);  // Backward at limited power (positive = backward for this motor)
+                backLeftMotor.setPower(-0.5);  // Backward at limited power (negative = backward for this motor)
+                frontRightMotor.setPower(0.5);  // Forward at limited power (positive = forward for this motor)
+                backRightMotor.setPower(-0.5);  // Forward at limited power (negative = forward for this motor)
             } else if (currentGamepad1.left_trigger > JOYSTICK_DEADZONE || currentGamepad2.left_trigger > JOYSTICK_DEADZONE) {
-                // LT: Proportional speed (uses actual trigger value 0.0 to 1.0)
+                // LT: Proportional speed (limited to max 0.5)
                 double ltPower = Math.max(currentGamepad1.left_trigger, currentGamepad2.left_trigger);
+                ltPower = Range.clip(ltPower, 0.0, 0.5);  // Limit to 0.5 max
                 frontLeftMotor.setPower(ltPower);  // Backward proportional to trigger (positive = backward)
                 backLeftMotor.setPower(-ltPower);  // Backward proportional to trigger (negative = backward)
                 frontRightMotor.setPower(ltPower);  // Forward proportional to trigger (positive = forward)
                 backRightMotor.setPower(-ltPower);  // Forward proportional to trigger (negative = forward)
             } else if (currentGamepad1.right_trigger > JOYSTICK_DEADZONE || currentGamepad2.right_trigger > JOYSTICK_DEADZONE) {
-                // RT Override: Control all 4 wheels with different pattern (proportional)
+                // RT Override: Control all 4 wheels with different pattern (proportional, limited to max 0.5)
                 // Front left: forward, Back left: forward, Front right: backward, Back right: backward
                 double rtPower = Math.max(currentGamepad1.right_trigger, currentGamepad2.right_trigger);
+                rtPower = Range.clip(rtPower, 0.0, 0.5);  // Limit to 0.5 max
                 frontLeftMotor.setPower(-rtPower);  // Forward proportional to trigger (negative = forward)
                 backLeftMotor.setPower(rtPower);  // Forward proportional to trigger (positive = forward)
                 frontRightMotor.setPower(-rtPower);  // Backward proportional to trigger (negative = backward)
@@ -1077,7 +1085,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 
                 // Start feeding
                 intakeMotor.setPower(1.0);
-                rampMotor.setPower(-RAMP_MOTOR_POWER * 0.4);
+                rampMotor.setPower(-0.85);  // Reverse power during launch (85% speed)
             }
             
             // Unlock wheels when launch is done
