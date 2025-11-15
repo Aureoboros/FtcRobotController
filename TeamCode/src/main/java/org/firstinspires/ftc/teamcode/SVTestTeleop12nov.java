@@ -197,6 +197,8 @@ public class SVTestTeleop12nov extends LinearOpMode {
         boolean launchMotorActive = false;
         boolean rampMotorActive = false;
         boolean launchMotorReverse = false;  // Flag for reverse launch motor mode (Y button)
+        boolean wheelsLocked = false;  // Flag to lock wheels during launch
+        double runtimeLaunchMotorPower = 0.5;  // Runtime adjustable launch motor power (default 0.5, min 0.5, max 0.75)
 
         waitForStart();
         if (isStopRequested()) return;
@@ -839,8 +841,15 @@ public class SVTestTeleop12nov extends LinearOpMode {
             }
 
             // ========== IMU RESET (BOTH GAMEPADS - BACK BUTTON) ==========
-            if ((currentGamepad1.back && !previousGamepad1.back) ||
-                    (currentGamepad2.back && !previousGamepad2.back)) {
+            // Only reset if BACK is pressed alone (not with DPAD in launch mode)
+            boolean backAloneG1 = currentGamepad1.back && !previousGamepad1.back && 
+                    !(launchMotorActive && !launchMotorReverse && 
+                      (currentGamepad1.dpad_up || currentGamepad1.dpad_down));
+            boolean backAloneG2 = currentGamepad2.back && !previousGamepad2.back && 
+                    !(launchMotorActive && !launchMotorReverse && 
+                      (currentGamepad2.dpad_up || currentGamepad2.dpad_down));
+            
+            if (backAloneG1 || backAloneG2) {
                 imu.resetYaw();
                 robotX = 0.0;
                 robotY = 0.0;
@@ -958,11 +967,19 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 frontRightMotor.setPower(-rtPower);  // Backward proportional to trigger (negative = backward)
                 backRightMotor.setPower(rtPower);  // Backward proportional to trigger (positive = backward)
             } else {
-                // Normal mecanum drive
-                frontLeftMotor.setPower(frontLeftPower);
-                backLeftMotor.setPower(backLeftPower);
-                frontRightMotor.setPower(frontRightPower);
-                backRightMotor.setPower(backRightPower);
+                // Normal mecanum drive (wheels locked during launch only)
+                if (wheelsLocked) {
+                    // Keep wheels locked at 0 during launch
+                    frontLeftMotor.setPower(0);
+                    backLeftMotor.setPower(0);
+                    frontRightMotor.setPower(0);
+                    backRightMotor.setPower(0);
+                } else {
+                    frontLeftMotor.setPower(frontLeftPower);
+                    backLeftMotor.setPower(backLeftPower);
+                    frontRightMotor.setPower(frontRightPower);
+                    backRightMotor.setPower(backRightPower);
+                }
             }
 
             // ========== INTAKE CONTROL (BOTH GAMEPADS) ==========
@@ -994,6 +1011,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 launchMotor.setPower(0);
                 launchMotorActive = false;
                 launchMotorReverse = false;
+                wheelsLocked = false;  // Unlock wheels when launch is stopped
             }
 
 
@@ -1022,7 +1040,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 launchMotor.setPower(launchPower);
                 launchStatus = "REVERSE";
             } else if (launchMotorActive) {
-                launchPower = LAUNCH_MOTOR_TARGET_POWER;  // Set to 0.65 when active
+                launchPower = runtimeLaunchMotorPower;  // Use runtime adjustable power
                 launchMotor.setPower(launchPower);
                 launchStatus = "RUNNING";
             } else {
@@ -1040,10 +1058,17 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 // Disable reverse mode if active
                 launchMotorReverse = false;
                 
+                // Lock wheels during launch to prevent movement
+                wheelsLocked = true;
+                frontLeftMotor.setPower(0);
+                backLeftMotor.setPower(0);
+                frontRightMotor.setPower(0);
+                backRightMotor.setPower(0);
+                
                 // Start launch motor if not already running
                 if (!launchMotorActive) {
                     launchMotorActive = true;
-                    launchMotor.setPower(LAUNCH_MOTOR_TARGET_POWER);  // Set to 0.65
+                    launchMotor.setPower(runtimeLaunchMotorPower);  // Use runtime adjustable power
                     sleep(3000);  // Wait for launch motor to spin up
                 } else {
                     // Already running, just wait a moment
@@ -1055,16 +1080,72 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 rampMotor.setPower(-RAMP_MOTOR_POWER * 0.4);
             }
             
+            // Unlock wheels when launch is done
+            if (wheelsLocked && !launchMotorActive && !launchMotorReverse) {
+                wheelsLocked = false;
+            }
+            
+            // ========== BACK + DPAD UP/DOWN - DYNAMIC LAUNCH MOTOR SPEED ADJUSTMENT (LAUNCH MODE ONLY) ==========
+            // Only works when launch motor is active (launch mode)
+            // BACK + DPAD UP: increase speed by 0.05 (max 0.75)
+            // BACK + DPAD DOWN: decrease speed by 0.05 (min 0.5)
+            if (launchMotorActive && !launchMotorReverse) {
+                // Check for BACK + DPAD UP combination
+                boolean backDpadUpG1 = currentGamepad1.back && currentGamepad1.dpad_up;
+                boolean backDpadUpG2 = currentGamepad2.back && currentGamepad2.dpad_up;
+                boolean backDpadUpPrevG1 = previousGamepad1.back && previousGamepad1.dpad_up;
+                boolean backDpadUpPrevG2 = previousGamepad2.back && previousGamepad2.dpad_up;
+                
+                // Check for BACK + DPAD DOWN combination
+                boolean backDpadDownG1 = currentGamepad1.back && currentGamepad1.dpad_down;
+                boolean backDpadDownG2 = currentGamepad2.back && currentGamepad2.dpad_down;
+                boolean backDpadDownPrevG1 = previousGamepad1.back && previousGamepad1.dpad_down;
+                boolean backDpadDownPrevG2 = previousGamepad2.back && previousGamepad2.dpad_down;
+                
+                // Increase speed (BACK + DPAD UP)
+                if ((backDpadUpG1 && !backDpadUpPrevG1) || (backDpadUpG2 && !backDpadUpPrevG2)) {
+                    runtimeLaunchMotorPower += 0.05;
+                    if (runtimeLaunchMotorPower > 0.75) {
+                        runtimeLaunchMotorPower = 0.75;  // Clamp to max 0.75
+                    }
+                    
+                    // Round to 2 decimal places to avoid floating point issues
+                    runtimeLaunchMotorPower = Math.round(runtimeLaunchMotorPower * 100.0) / 100.0;
+                    
+                    // Update launch motor power immediately
+                    launchMotor.setPower(runtimeLaunchMotorPower);
+                    
+                    telemetry.addLine("Launch Motor Speed: " + String.format("%.2f", runtimeLaunchMotorPower) + " (INCREASED)");
+                }
+                
+                // Decrease speed (BACK + DPAD DOWN)
+                if ((backDpadDownG1 && !backDpadDownPrevG1) || (backDpadDownG2 && !backDpadDownPrevG2)) {
+                    runtimeLaunchMotorPower -= 0.05;
+                    if (runtimeLaunchMotorPower < 0.5) {
+                        runtimeLaunchMotorPower = 0.5;  // Clamp to min 0.5
+                    }
+                    
+                    // Round to 2 decimal places to avoid floating point issues
+                    runtimeLaunchMotorPower = Math.round(runtimeLaunchMotorPower * 100.0) / 100.0;
+                    
+                    // Update launch motor power immediately
+                    launchMotor.setPower(runtimeLaunchMotorPower);
+                    
+                    telemetry.addLine("Launch Motor Speed: " + String.format("%.2f", runtimeLaunchMotorPower) + " (DECREASED)");
+                }
+            }
+            
             // Y button - Stop launch and start intake (for pickup)
             if ((currentGamepad1.y && !previousGamepad1.y) ||
                     (currentGamepad2.y && !previousGamepad2.y)) {
                 launchMotorActive = false;
                 launchMotorReverse = true;  // Enable reverse mode
+                wheelsLocked = false;  // Unlock wheels
                 launchMotor.setPower(0);  // Stop launch motor
                 sleep(500);  // Wait 500ms
                 intakeMotor.setPower(1.0);  // Start intake motor (power = 1.0)
                 rampMotor.setPower(-0.5);  // Start ramp motor in reverse direction (power = 0.5)
-                launchMotor.setPower(-0.7);  // Start launch motor in reverse (power = -0.7)
+                launchMotor.setPower(-0.8);  // Start launch motor in reverse (power = -0.7)
             }
 
             // ========== ENHANCED TELEMETRY ==========
@@ -1218,6 +1299,12 @@ public class SVTestTeleop12nov extends LinearOpMode {
             telemetry.addLine();
             telemetry.addData("Intake", intakeStatus);
             telemetry.addData("Launch", launchStatus);
+            telemetry.addData("Launch Motor Speed", "%.2f", launchPower);
+            if (launchMotorActive && !launchMotorReverse) {
+                telemetry.addData("Launch Motor Speed (Target)", "%.2f (BACK+DPAD UP/DOWN to adjust)", runtimeLaunchMotorPower);
+            } else {
+                telemetry.addData("Launch Motor Speed (Target)", "%.2f", runtimeLaunchMotorPower);
+            }
             telemetry.addLine();
             if (slowMode) {
                 telemetry.addData("Slow Mode", "ACTIVE (30%)");
