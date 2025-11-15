@@ -31,10 +31,10 @@ public class SimpleAutoCode extends LinearOpMode{
         backRightMotor.setDirection(DcMotorSimple.Direction.FORWARD);
         waitForStart();
 
-        frontLeftMotor.setPower(0.8);
-        backLeftMotor.setPower(0.8);
-        frontRightMotor.setPower(-0.8);
-        backRightMotor.setPower(-0.8);
+        frontLeftMotor.setPower(0.5);
+        backLeftMotor.setPower(0.5);
+        frontRightMotor.setPower(-0.5);
+        backRightMotor.setPower(-0.5);
 
         sleep(1000);
 
