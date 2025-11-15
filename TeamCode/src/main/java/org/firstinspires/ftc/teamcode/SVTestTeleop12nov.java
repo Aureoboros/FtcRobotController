@@ -65,6 +65,12 @@ public class SVTestTeleop12nov extends LinearOpMode {
     // Target position (0, 0) - field center
     private static final double TARGET_X = 0.0;
     private static final double TARGET_Y = 0.0;
+    
+    // ========== CUSTOM TARGET POSITION ==========
+    private double customTargetX = 0.0;  // in feet (field coordinates)
+    private double customTargetY = 0.0;  // in feet (field coordinates)
+    private double customTargetZ = 0.0;  // in inches (height/distance, for reference)
+    private boolean navigatingToCustomTarget = false;
 
     // ========== STATE VARIABLES ==========
     private enum Alliance {NONE, RED, BLUE}
@@ -86,6 +92,13 @@ public class SVTestTeleop12nov extends LinearOpMode {
     private double cumulativeRotation = 0.0;  // in radians - track total rotation
     private static final double SEARCH_ROTATION_SPEED = 0.3;
     private static final double SEARCH_COMPLETION_TOLERANCE = 10.0;  // degrees - allow 10° overshoot
+    
+    // ========== RB BUTTON ROTATION SEARCH STATE ==========
+    private boolean rotatingToTag20 = false;  // RB button rotation search for Tag 20
+    private double rbRotationStartHeading = 0.0;  // in radians
+    private double rbLastHeading = 0.0;  // in radians
+    private double rbCumulativeRotation = 0.0;  // in radians
+    private static final double RB_ROTATION_SPEED = 0.25;  // Slow rotation speed for RB search
     
     // ========== POSITION TRACKING ==========
     private double robotX = 0.0;  // in feet
@@ -122,6 +135,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
 
         // Motor modes for mechanisms
         intakeMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        launchMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);  // Enable continuous movement
         rampMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
         // Set brake behavior
@@ -182,6 +196,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
         boolean intakeReverseActive = false;
         boolean launchMotorActive = false;
         boolean rampMotorActive = false;
+        boolean launchMotorReverse = false;  // Flag for reverse launch motor mode (Y button)
 
         waitForStart();
         if (isStopRequested()) return;
@@ -194,14 +209,25 @@ public class SVTestTeleop12nov extends LinearOpMode {
             currentGamepad2.copy(gamepad2);
 
 
-            // ========== ALLIANCE SELECTION (BOTH GAMEPADS) ==========
-            // Note: LB is now dedicated to front left wheel control, removed from alliance selection
-            // RB for BLUE alliance
-            if ((currentGamepad1.right_bumper && !previousGamepad1.right_bumper) ||
-                    (currentGamepad2.right_bumper && !previousGamepad2.right_bumper)) {
-                selectedAlliance = Alliance.BLUE;
+            // ========== RB BUTTON - ROTATE TO FIND TAG 20 (BOTH GAMEPADS) ==========
+            // Hold RB to rotate slowly until AprilTag 20 is detected
+            boolean rbPressed = currentGamepad1.right_bumper || currentGamepad2.right_bumper;
+            boolean rbJustPressed = (currentGamepad1.right_bumper && !previousGamepad1.right_bumper) ||
+                    (currentGamepad2.right_bumper && !previousGamepad2.right_bumper);
+            boolean rbJustReleased = (!currentGamepad1.right_bumper && previousGamepad1.right_bumper) ||
+                    (!currentGamepad2.right_bumper && previousGamepad2.right_bumper);
+            
+            if (rbJustPressed || (rbPressed && !rotatingToTag20)) {
+                // Start rotation search (on press or if currently held but not yet active)
+                rotatingToTag20 = true;
+                rbRotationStartHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+                rbLastHeading = rbRotationStartHeading;
+                rbCumulativeRotation = 0.0;
+            } else if (rbJustReleased || (!rbPressed && rotatingToTag20)) {
+                // Stop rotation search when button is released
+                rotatingToTag20 = false;
+                rbCumulativeRotation = 0.0;
             }
-            // TODO: Add another button for RED alliance selection if needed
 
             // ========== TRIGGERS NOW USED FOR ROTATION ==========
             // LT and RT are now used for manual rotation control
@@ -247,10 +273,67 @@ public class SVTestTeleop12nov extends LinearOpMode {
                     autoNavigatingToZero = true;
                     autoAligning = false;
                     aimingAtTag20 = false;
+                    navigatingToCustomTarget = false;
                     telemetry.addLine("✓ Navigating to (0,0) using Tag 20");
                 } else {
                     telemetry.addLine("⚠ Tag 20 not detected!");
                     telemetry.addLine("Hold RIGHT TRIGGER to search for Tag 20");
+                }
+            }
+            
+            // ========== DPAD UP - DETECT POSITION AND SET TARGET TO TAG 20 (BOTH GAMEPADS) ==========
+            // Detect current robot position from Tag 20 and set target to Tag 20's field position
+            if ((currentGamepad1.dpad_up && !previousGamepad1.dpad_up) ||
+                    (currentGamepad2.dpad_up && !previousGamepad2.dpad_up)) {
+                AprilTagDetection tag20 = getAprilTagDetection(TARGET_TAG_20_ID);
+                if (tag20 != null) {
+                    // Calculate where the robot currently is (using Tag 20's known field position)
+                    calculatePositionFromTag(tag20, TAG_20_X, TAG_20_Y, imu);
+                    
+                    // Set target to Tag 20's known field position
+                    customTargetX = TAG_20_X;  // Tag 20's field X position (feet)
+                    customTargetY = TAG_20_Y;  // Tag 20's field Y position (feet)
+                    customTargetZ = tag20.ftcPose.z;  // Z from telemetry (inches, for reference)
+                    
+                    telemetry.addLine("✓ Position detected and target set to Tag 20");
+                    telemetry.addData("Current Robot Position", "X: %.2f ft, Y: %.2f ft", robotX, robotY);
+                    telemetry.addData("Tag 20 Field Position", "X: %.2f ft, Y: %.2f ft", TAG_20_X, TAG_20_Y);
+                    telemetry.addData("Tag 20 Telemetry (x,y,z)", "X: %.1f in, Y: %.1f in, Z: %.1f in", 
+                            tag20.ftcPose.x, tag20.ftcPose.y, tag20.ftcPose.z);
+                    telemetry.addData("Target Position", "X: %.2f ft, Y: %.2f ft, Z: %.1f in", 
+                            customTargetX, customTargetY, customTargetZ);
+                    double distanceToTag = Math.sqrt((customTargetX - robotX) * (customTargetX - robotX) + 
+                                                    (customTargetY - robotY) * (customTargetY - robotY)) * 12.0;
+                    telemetry.addData("Distance to Tag 20", "%.1f inches", distanceToTag);
+                    telemetry.addLine("Press DPAD LEFT to navigate to Tag 20");
+                } else {
+                    telemetry.addLine("⚠ Tag 20 not detected!");
+                    telemetry.addLine("Cannot detect position without Tag 20");
+                    telemetry.addLine("Hold RB to search for Tag 20");
+                }
+            }
+            
+            // ========== DPAD LEFT - NAVIGATE TO CUSTOM TARGET (BOTH GAMEPADS) ==========
+            // Navigate to the custom target position set from Tag 20
+            if ((currentGamepad1.dpad_left && !previousGamepad1.dpad_left) ||
+                    (currentGamepad2.dpad_left && !previousGamepad2.dpad_left)) {
+                AprilTagDetection tag20 = getAprilTagDetection(TARGET_TAG_20_ID);
+                if (tag20 != null) {
+                    // Update current position from Tag 20
+                    calculatePositionFromTag(tag20, TAG_20_X, TAG_20_Y, imu);
+                    // Start navigation to custom target
+                    navigatingToCustomTarget = true;
+                    autoNavigatingToZero = false;
+                    autoAligning = false;
+                    aimingAtTag20 = false;
+                    telemetry.addLine("✓ Navigating to custom target");
+                    telemetry.addData("Current Position", "X: %.2f ft, Y: %.2f ft", robotX, robotY);
+                    telemetry.addData("Target Position", "X: %.2f ft, Y: %.2f ft, Z: %.1f in", 
+                            customTargetX, customTargetY, customTargetZ);
+                } else {
+                    telemetry.addLine("⚠ Tag 20 not detected!");
+                    telemetry.addLine("Need Tag 20 for position tracking");
+                    telemetry.addLine("Hold RB to search for Tag 20");
                 }
             }
 
@@ -266,10 +349,13 @@ public class SVTestTeleop12nov extends LinearOpMode {
                     currentGamepad2.left_trigger > JOYSTICK_DEADZONE ||
                     currentGamepad2.right_trigger > JOYSTICK_DEADZONE;
 
-            if (driverOverride) {
+            if (driverOverride && !rotatingToTag20) {
+                // Driver override - but don't override RB rotation search
                 if (autoAligning) autoAligning = false;
                 if (autoNavigatingToZero) autoNavigatingToZero = false;
+                if (navigatingToCustomTarget) navigatingToCustomTarget = false;
                 if (aimingAtTag20) aimingAtTag20 = false;
+                // Don't cancel rotatingToTag20 - let it continue until Tag 20 is found
             }
             
             // Update robot heading from IMU (for position tracking and auto-navigation)
@@ -303,6 +389,14 @@ public class SVTestTeleop12nov extends LinearOpMode {
                     Math.abs(currentGamepad2.right_stick_x) > JOYSTICK_DEADZONE ||
                     currentGamepad2.left_trigger > JOYSTICK_DEADZONE ||
                     currentGamepad2.right_trigger > JOYSTICK_DEADZONE;
+
+            // ========== RB BUTTON ROTATION SEARCH FOR TAG 20 ==========
+            // Note: Motor powers are set directly in the motor power section below (like LB/LT/RT)
+            // This section just updates status for telemetry if rotation is active but status not set yet
+            if (rotatingToTag20 && autoStatus.equals("MANUAL")) {
+                double rotationDegrees = Math.toDegrees(rbCumulativeRotation);
+                autoStatus = String.format("RB: SEARCHING FOR TAG 20... (%.0f° rotated)", rotationDegrees);
+            }
 
             if (aimingAtTag20) {
                 // ========== AIM AT APRILTAG ID 20 ==========
@@ -527,6 +621,117 @@ public class SVTestTeleop12nov extends LinearOpMode {
                     autoStatus = String.format("NAV TO (0,0): %.1f\" @ %.1f%% | X:%.2f Y:%.2f", 
                             distanceInches, speed * 100, x, y);
                 }
+            } else if (navigatingToCustomTarget) {
+                // ========== AUTONOMOUS NAVIGATION TO CUSTOM TARGET (X, Y, Z) ==========
+                // Update position from AprilTag during navigation for better accuracy
+                AprilTagDetection navTag20 = getAprilTagDetection(TARGET_TAG_20_ID);
+                AprilTagDetection navObeliskTag = null;
+                if (navTag20 != null) {
+                    // Update position from Tag 20 if visible
+                    calculatePositionFromTag(navTag20, TAG_20_X, TAG_20_Y, imu);
+                } else {
+                    // Fall back to obelisk tags if Tag 20 not visible
+                    navObeliskTag = getAnyObeliskTag();
+                    if (navObeliskTag != null) {
+                        calculatePositionFromObelisk(navObeliskTag, imu);
+                    }
+                }
+                
+                double deltaX = customTargetX - robotX;
+                double deltaY = customTargetY - robotY;
+                double distanceToTarget = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                double distanceInches = distanceToTarget * 12.0;
+                double distanceFeet = distanceToTarget;
+
+                if (distanceInches < POSITION_TOLERANCE_INCHES) {
+                    // Reached target, stop immediately
+                    x = 0;
+                    y = 0;
+                    rx = 0;
+                    autoStatus = String.format("AT TARGET ✓ (%.1f\" away) | Z: %.1f\"", distanceInches, customTargetZ);
+                } else {
+                    // Calculate angle to target in field coordinates
+                    double angleToTarget = Math.atan2(deltaX, deltaY);
+                    
+                    // Progressive speed control with multiple zones for smooth deceleration
+                    double speed = AUTO_NAV_MAX_SPEED;
+                    
+                    if (distanceInches < 12.0) {
+                        // Final braking zone (within 12 inches) - very slow
+                        speed = AUTO_NAV_MIN_SPEED * 0.3;
+                    } else if (distanceInches < BRAKING_ZONE_INCHES) {
+                        // Aggressive braking zone (12 to 18 inches)
+                        double brakingRatio = (distanceInches - 12.0) / (BRAKING_ZONE_INCHES - 12.0);
+                        speed = AUTO_NAV_MIN_SPEED * (0.3 + 0.4 * brakingRatio);
+                    } else if (distanceFeet < BRAKING_DISTANCE_FEET) {
+                        // Near braking zone (18 inches to 3 feet) - moderate braking
+                        double brakingRatio = (distanceFeet - BRAKING_ZONE_INCHES / 12.0) / (BRAKING_DISTANCE_FEET - BRAKING_ZONE_INCHES / 12.0);
+                        speed = AUTO_NAV_MIN_SPEED * 0.7 + (AUTO_NAV_MID_SPEED - AUTO_NAV_MIN_SPEED * 0.7) * brakingRatio;
+                    } else if (distanceFeet < SLOWDOWN_DISTANCE_FEET) {
+                        // Gradual slowdown zone (3 to 6 feet)
+                        double slowdownRatio = (distanceFeet - BRAKING_DISTANCE_FEET) / (SLOWDOWN_DISTANCE_FEET - BRAKING_DISTANCE_FEET);
+                        speed = AUTO_NAV_MID_SPEED + (AUTO_NAV_MAX_SPEED - AUTO_NAV_MID_SPEED) * slowdownRatio;
+                    } else {
+                        // Full speed zone (beyond 6 feet)
+                        speed = AUTO_NAV_MAX_SPEED;
+                    }
+                    
+                    // Additional slowdown when Tag 20 is visible
+                    if (navTag20 != null) {
+                        speed *= 0.9;
+                    } else if (navObeliskTag == null) {
+                        speed *= 0.7;
+                    }
+
+                    // Ensure minimum speed is maintained
+                    double minSpeed;
+                    if (distanceInches > 36.0) {
+                        minSpeed = AUTO_NAV_MID_SPEED;
+                    } else if (distanceInches > 24.0) {
+                        minSpeed = AUTO_NAV_MIN_SPEED * 1.5;
+                    } else if (distanceInches > 12.0) {
+                        minSpeed = AUTO_NAV_MIN_SPEED;
+                    } else {
+                        minSpeed = AUTO_NAV_MIN_SPEED * 0.6;
+                    }
+                    speed = Math.max(speed, minSpeed);
+
+                    // Convert to robot frame
+                    double heading = robotHeading;
+                    double robotRelativeAngle = angleToTarget - heading;
+                    while (robotRelativeAngle > Math.PI) robotRelativeAngle -= 2 * Math.PI;
+                    while (robotRelativeAngle < -Math.PI) robotRelativeAngle += 2 * Math.PI;
+                    
+                    x = Math.sin(robotRelativeAngle) * speed;
+                    y = Math.cos(robotRelativeAngle) * speed;
+                    
+                    // Heading correction
+                    double headingError = angleToTarget - heading;
+                    while (headingError > Math.PI) headingError -= 2 * Math.PI;
+                    while (headingError < -Math.PI) headingError += 2 * Math.PI;
+                    
+                    double rotationGain = 0.12;
+                    if (distanceInches < 24.0) {
+                        rotationGain = 0.06;
+                    }
+                    if (distanceInches < 12.0) {
+                        rotationGain = 0.03;
+                    }
+                    rx = headingError * rotationGain;
+                    
+                    double maxRotationSpeed = 0.12;
+                    if (distanceInches < 12.0) {
+                        maxRotationSpeed = 0.06;
+                    }
+                    rx = Math.max(Math.min(rx, maxRotationSpeed), -maxRotationSpeed);
+                    
+                    autoStatus = String.format("NAV TO TARGET: %.1f\" @ %.1f%% | X:%.2f Y:%.2f Z:%.1f\"", 
+                            distanceInches, speed * 100, x, y, customTargetZ);
+                }
+            } else if (rotatingToTag20) {
+                // ========== RB BUTTON ROTATION SEARCH FOR TAG 20 ==========
+                // This is already handled above, but ensure it doesn't get overridden
+                // Values are already set in the earlier RB rotation block
             } else if (autoAligning) {
                 // ========== APRILTAG AUTO-ALIGNMENT ==========
                 int targetTag = (selectedAlliance == Alliance.RED) ? RED_APRILTAG_ID : BLUE_APRILTAG_ID;
@@ -689,10 +894,49 @@ public class SVTestTeleop12nov extends LinearOpMode {
             }
 
             // Set motor powers
-            // LB/LT Override: Control all 4 wheels (takes priority)
+            // RB Override: Rotate slowly until Tag 20 detected (takes highest priority)
+            if (rotatingToTag20) {
+                // Check for Tag 20 detection
+                AprilTagDetection tag20Detection = getAprilTagDetection(TARGET_TAG_20_ID);
+                
+                if (tag20Detection != null) {
+                    // Tag 20 detected! Stop rotation
+                    rotatingToTag20 = false;
+                    rbCumulativeRotation = 0.0;
+                    autoStatus = "TAG 20 DETECTED ✓";
+                    frontLeftMotor.setPower(0.0);
+                    backLeftMotor.setPower(0.0);
+                    frontRightMotor.setPower(0.0);
+                    backRightMotor.setPower(0.0);
+                } else {
+                    // Tag not detected yet, continue rotating slowly clockwise
+                    // Update rotation tracking
+                    double currentHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+                    robotHeading = currentHeading;
+                    
+                    // Calculate incremental rotation (handle wraparound)
+                    double headingDelta = currentHeading - rbLastHeading;
+                    while (headingDelta > Math.PI) headingDelta -= 2 * Math.PI;
+                    while (headingDelta < -Math.PI) headingDelta += 2 * Math.PI;
+                    rbCumulativeRotation += Math.abs(headingDelta);
+                    rbLastHeading = currentHeading;
+                    
+                    // Update status
+                    double rotationDegrees = Math.toDegrees(rbCumulativeRotation);
+                    autoStatus = String.format("RB: SEARCHING FOR TAG 20... (%.0f° rotated)", rotationDegrees);
+                    
+                    // Rotate slowly clockwise using RT pattern
+                    // Front left: forward, Back left: forward, Front right: backward, Back right: backward
+                    frontLeftMotor.setPower(-RB_ROTATION_SPEED);  // Forward (negative = forward)
+                    backLeftMotor.setPower(RB_ROTATION_SPEED);  // Forward (positive = forward)
+                    frontRightMotor.setPower(-RB_ROTATION_SPEED);  // Backward (negative = backward)
+                    backRightMotor.setPower(RB_ROTATION_SPEED);  // Backward (positive = backward)
+                }
+            }
+            // LB/LT Override: Control all 4 wheels (takes priority after RB)
             // Front left: backward, Back left: backward, Front right: forward, Back right: forward
             // LB (bumper) is binary (full power), LT (trigger) is proportional (0.0 to 1.0)
-            if (currentGamepad1.left_bumper || currentGamepad2.left_bumper) {
+            else if (currentGamepad1.left_bumper || currentGamepad2.left_bumper) {
                 // LB: Full power (binary)
                 frontLeftMotor.setPower(1.0);  // Backward at full power (positive = backward for this motor)
                 backLeftMotor.setPower(-1.0);  // Backward at full power (negative = backward for this motor)
@@ -735,11 +979,21 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 if (intakeForwardActive) intakeReverseActive = false;
             }
 
-            // A button - toggle intake reverse
+            // A button - Stop all motors (intake and ramp immediately, launch after 0.5s)
             if ((currentGamepad1.a && !previousGamepad1.a) ||
                     (currentGamepad2.a && !previousGamepad2.a)) {
-                intakeReverseActive = !intakeReverseActive;
-                if (intakeReverseActive) intakeForwardActive = false;
+                // Stop intake and ramp immediately
+                intakeMotor.setPower(0);
+                rampMotor.setPower(0);
+                intakeForwardActive = false;
+                intakeReverseActive = false;
+                rampMotorActive = false;
+                
+                // Stop launch motor after 0.5 seconds
+                sleep(500);
+                launchMotor.setPower(0);
+                launchMotorActive = false;
+                launchMotorReverse = false;
             }
 
 
@@ -762,7 +1016,12 @@ public class SVTestTeleop12nov extends LinearOpMode {
             // Update launch motor power based on state
             double launchPower = 0;
             String launchStatus = "STOPPED";
-            if (launchMotorActive) {
+            if (launchMotorReverse) {
+                // Reverse mode (Y button) - don't override
+                launchPower = -0.7;
+                launchMotor.setPower(launchPower);
+                launchStatus = "REVERSE";
+            } else if (launchMotorActive) {
                 launchPower = LAUNCH_MOTOR_TARGET_POWER;  // Set to 0.65 when active
                 launchMotor.setPower(launchPower);
                 launchStatus = "RUNNING";
@@ -777,6 +1036,9 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 // Stop intake and ramp
                 intakeMotor.setPower(0);
                 rampMotor.setPower(0);
+                
+                // Disable reverse mode if active
+                launchMotorReverse = false;
                 
                 // Start launch motor if not already running
                 if (!launchMotorActive) {
@@ -797,9 +1059,12 @@ public class SVTestTeleop12nov extends LinearOpMode {
             if ((currentGamepad1.y && !previousGamepad1.y) ||
                     (currentGamepad2.y && !previousGamepad2.y)) {
                 launchMotorActive = false;
-                launchMotor.setPower(0);
-                sleep(500);  // Brief pause
-                intakeMotor.setPower(1.0);  // Start intake for pickup
+                launchMotorReverse = true;  // Enable reverse mode
+                launchMotor.setPower(0);  // Stop launch motor
+                sleep(500);  // Wait 500ms
+                intakeMotor.setPower(1.0);  // Start intake motor (power = 1.0)
+                rampMotor.setPower(-0.5);  // Start ramp motor in reverse direction (power = 0.5)
+                launchMotor.setPower(-0.7);  // Start launch motor in reverse (power = -0.7)
             }
 
             // ========== ENHANCED TELEMETRY ==========
@@ -808,7 +1073,7 @@ public class SVTestTeleop12nov extends LinearOpMode {
             telemetry.addData("Alliance", selectedAlliance);
             telemetry.addData("Robot Position", "X: %.2f ft, Y: %.2f ft", robotX, robotY);
             telemetry.addData("Robot Heading", "%.1f°", Math.toDegrees(robotHeading));
-            if (!autoNavigatingToZero && !autoAligning && !aimingAtTag20) {
+            if (!autoNavigatingToZero && !navigatingToCustomTarget && !autoAligning && !aimingAtTag20 && !rotatingToTag20) {
                 telemetry.addData("Drive Mode", "ROBOT-CENTRIC (Dpad + Right Stick)");
                 telemetry.addData("Movement Input", "X: %.2f (Dpad L/R), Y: %.2f (Dpad U/D), RX: %.2f (Right Stick)", x, y, rx);
                 telemetry.addData("Motor Powers", "FL: %.2f, BL: %.2f, FR: %.2f, BR: %.2f", 
@@ -817,8 +1082,42 @@ public class SVTestTeleop12nov extends LinearOpMode {
             telemetry.addData("Active Driver", activeDriver);
             telemetry.addLine();
             telemetry.addData("Drive Mode", autoStatus);
+            // Debug: Show RB button status
+            boolean rbDebug = currentGamepad1.right_bumper || currentGamepad2.right_bumper;
+            telemetry.addData("RB Button", rbDebug ? "PRESSED" : "not pressed");
             if (autoAligning) {
                 telemetry.addData(">>> AUTO-ALIGN", "ACTIVE <<<");
+            }
+            if (rotatingToTag20) {
+                telemetry.addData(">>> RB: ROTATING TO FIND TAG 20", "ACTIVE <<<");
+                double rotationDegrees = Math.toDegrees(rbCumulativeRotation);
+                telemetry.addData("Rotation Progress", "%.0f° rotated", rotationDegrees);
+                telemetry.addData("Rotation Speed", "%.2f", RB_ROTATION_SPEED);
+                
+                AprilTagDetection tag20 = getAprilTagDetection(TARGET_TAG_20_ID);
+                if (tag20 != null) {
+                    telemetry.addLine();
+                    telemetry.addData(">>> TAG 20 DETECTED! ✓", "");
+                    telemetry.addData("Tag 20 Range", "%.1f inches", tag20.ftcPose.range);
+                    telemetry.addData("Tag 20 X", "%.1f inches", tag20.ftcPose.x);
+                    telemetry.addData("Tag 20 Y", "%.1f inches", tag20.ftcPose.y);
+                    telemetry.addData("Tag 20 Z", "%.1f inches", tag20.ftcPose.z);
+                    telemetry.addData("Tag 20 Yaw", "%.1f°", tag20.ftcPose.yaw);
+                    telemetry.addData("Tag 20 Bearing", "%.1f°", tag20.ftcPose.bearing);
+                    telemetry.addData("Tag 20 Elevation", "%.1f°", tag20.ftcPose.elevation);
+                } else {
+                    telemetry.addData("Tag 20 Status", "NOT DETECTED - ROTATING...");
+                    // Show what tags ARE detected for debugging
+                    List<AprilTagDetection> allDetections = aprilTag.getDetections();
+                    if (allDetections.size() > 0) {
+                        telemetry.addData("Detected Tags", "%d tags visible (not Tag 20)", allDetections.size());
+                        for (AprilTagDetection det : allDetections) {
+                            telemetry.addData("  Tag ID", "%d", det.id);
+                        }
+                    } else {
+                        telemetry.addData("No Tags", "Visible in camera");
+                    }
+                }
             }
             if (aimingAtTag20) {
                 telemetry.addData(">>> AIMING AT TAG 20", "ACTIVE <<<");
@@ -829,10 +1128,11 @@ public class SVTestTeleop12nov extends LinearOpMode {
                 AprilTagDetection tag20 = getAprilTagDetection(TARGET_TAG_20_ID);
                 if (tag20 != null) {
                     telemetry.addData("Tag 20 Range", "%.1f inches", tag20.ftcPose.range);
-                    telemetry.addData("Tag 20 Yaw", "%.1f°", tag20.ftcPose.yaw);
-                    telemetry.addData("Tag 20 Bearing", "%.1f°", tag20.ftcPose.bearing);
                     telemetry.addData("Tag 20 X", "%.1f inches", tag20.ftcPose.x);
                     telemetry.addData("Tag 20 Y", "%.1f inches", tag20.ftcPose.y);
+                    telemetry.addData("Tag 20 Z", "%.1f inches", tag20.ftcPose.z);
+                    telemetry.addData("Tag 20 Yaw", "%.1f°", tag20.ftcPose.yaw);
+                    telemetry.addData("Tag 20 Bearing", "%.1f°", tag20.ftcPose.bearing);
                     telemetry.addData("Tag 20 Elevation", "%.1f°", tag20.ftcPose.elevation);
                     
                     // Camera angle diagnostics
@@ -866,6 +1166,29 @@ public class SVTestTeleop12nov extends LinearOpMode {
                         telemetry.addLine("  2. Camera field of view");
                         telemetry.addLine("  3. Lighting conditions");
                     }
+                }
+            }
+            if (navigatingToCustomTarget) {
+                telemetry.addData(">>> NAV TO CUSTOM TARGET", "ACTIVE <<<");
+                telemetry.addData("Current Position", "X: %.2f ft, Y: %.2f ft", robotX, robotY);
+                double distToTarget = Math.sqrt((customTargetX - robotX) * (customTargetX - robotX) + 
+                                               (customTargetY - robotY) * (customTargetY - robotY)) * 12.0;
+                telemetry.addData("Distance to Target", "%.1f inches", distToTarget);
+                telemetry.addData("Delta", "X: %.2f ft, Y: %.2f ft", (customTargetX - robotX), (customTargetY - robotY));
+                telemetry.addData("Target Position", "X: %.2f ft, Y: %.2f ft, Z: %.1f in", customTargetX, customTargetY, customTargetZ);
+                
+                // Show which tag is being used for positioning
+                AprilTagDetection telemetryTag20 = getAprilTagDetection(TARGET_TAG_20_ID);
+                AprilTagDetection telemetryObeliskTag = getAnyObeliskTag();
+                if (telemetryTag20 != null) {
+                    telemetry.addData("Using Tag", "Tag 20 for position");
+                    telemetry.addData("Tag 20 Range", "%.1f inches", telemetryTag20.ftcPose.range);
+                    telemetry.addData("Tag 20 X, Y, Z", "%.1f, %.1f, %.1f in", 
+                            telemetryTag20.ftcPose.x, telemetryTag20.ftcPose.y, telemetryTag20.ftcPose.z);
+                } else if (telemetryObeliskTag != null) {
+                    telemetry.addData("Using Tag", "Obelisk tag for position");
+                } else {
+                    telemetry.addData("Position Update", "No tags visible");
                 }
             }
             if (autoNavigatingToZero) {
